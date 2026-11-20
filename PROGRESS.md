@@ -208,6 +208,27 @@ ruff clean) and what was run on this PC.
 
 ## Log (newest first)
 
+### 2026-11-20 20:45 — Review of Codex's external test (tools/public-test, authorized by the user)
+- **Setup checked:**
+  - a separate Reel copy on 127.0.0.1:8091 with its own database, recordings, groups and consent files, behind a Cloudflare Quick Tunnel;
+  - YouTube live (unlisted); Slack and Classroom dry-run;
+  - the supervisor, tunnel and server processes from `processes.json` are alive;
+  - production source is untouched (`git status` clean).
+- **Behaviour seen:**
+  - The consent gate holds: the review file's empty roster gives `unknown`, so every test video waits for "Ընդունել և շարունակել". No consent is made up.
+  - Client addresses arrive through the tunnel (X-Forwarded-For from 127.0.0.1), so the login throttle sees real addresses.
+  - Groups typed there are added to the test registry only (D-061; "Math" was added).
+- **The only real upload so far:**
+  - test job 1, group "Math", 9.9 MB, 19 s long;
+  - the browser upload took about 3.6 s through the tunnel (16:35:15.6 → 16:35:19.1 UTC), about 2.8 MB/s;
+  - Import rejected it in 0.35 s: "too short: 19.0 s (minimum 300.0 s)" (`ingest.min_duration_minutes = 5`);
+  - so there is no upload-to-YouTube time yet.
+- **Points for the user:**
+  - the friend must upload a lesson of at least 5 minutes;
+  - `C:\Users\User\Desktop\warehouse\reel-test-access.json` holds the test password inside another git repository and is not ignored there;
+  - the quick tunnel exposes a login page to anyone with the URL until `stop.ps1` runs;
+  - the test copy shares the YouTube channel and its daily quota with production (one production upload was made today).
+
 ### 2026-11-20 20:38 — First real YouTube upload: job #2 is on the channel (unlisted)
 - **The user:** the processed video should go to the friend's channel now; the playlist does not matter.
 - **Why job #2 had stopped again:**
