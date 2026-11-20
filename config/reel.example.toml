@@ -1,0 +1,247 @@
+# Reel configuration. Copy this file to config/reel.toml (or run `reel config init`).
+#
+# - Every value below is the built-in default; a line you delete keeps its default.
+# - Relative paths are relative to the project folder (the folder that contains config/).
+# - Secrets (tokens, passwords, keys) never go in this file. Put them in .env (see .env.example).
+# - Any setting can be overridden by an environment variable REEL__<SECTION>__<KEY>,
+#   for example REEL__WORKERS__COUNT=1 or REEL__CLEANING__SILENCE__NOISE_DB=-40.
+# - Changes apply when the next pipeline stage starts; no restart or code change is needed.
+# - Check the file with: reel config check
+
+[paths]
+base_dir = ""                              # empty = the folder that contains config/
+data_dir = "data"                          # database and per-recording working files
+database_file = ""                         # empty = <data_dir>/reel.db (SQLite; keep it on a local disk)
+logs_dir = "logs"
+models_dir = "models"                      # downloaded speech-recognition models
+groups_file = "config/groups.toml"         # group -> playlist / Slack / Classroom mapping
+prompts_dir = "config/prompts"             # LLM prompt templates (FR-34)
+ffmpeg = "tools/ffmpeg/bin/ffmpeg.exe"     # on Linux: "ffmpeg" (looked up on PATH)
+ffprobe = "tools/ffmpeg/bin/ffprobe.exe"
+ollama = "tools/ollama/ollama.exe"         # local LLM server (scripts/setup_ollama.py)
+
+[ingest]                                   # FR-1 ... FR-3
+watch_folders = ["inbox"]                  # each holds one sub-folder per group (D-018)
+extensions = [".mp4", ".mkv", ".mov", ".webm", ".m4v", ".avi"]
+ignore_patterns = ["~*", ".*", "*.part", "*.tmp", "*.crdownload"]
+scan_interval_seconds = 15.0
+stable_seconds = 60.0                      # size and time unchanged this long = fully written
+min_duration_minutes = 5.0                 # shorter files are rejected as invalid
+# Lesson number in the file name. Each pattern needs exactly one (group) around the number.
+lesson_number_patterns = [
+    '(?i)(?:lecture|lesson|lec)[\s_.#-]*(\d{1,3})(?!\d)',
+    '(?i)(?<![a-z])L[\s_.#-]?(\d{1,3})(?!\d)',
+    '(?i)դաս[\s_.#-]*(\d{1,3})(?!\d)',
+]
+# Recording date in the file name, with the named groups year, month and day.
+date_patterns = [
+    '(?<!\d)(?P<year>20\d{2})[-_.](?P<month>\d{2})[-_.](?P<day>\d{2})(?!\d)',   # 2026-11-19
+    '(?<!\d)(?P<day>\d{2})[-_.](?P<month>\d{2})[-_.](?P<year>20\d{2})(?!\d)',   # 19.11.2026
+]
+
+[workers]                                  # FR-31, NFR-3
+count = 2                                  # parallel jobs
+heavy_stage_limit = 1                      # parallel CPU-heavy stages (transcription, render, LLM)
+max_attempts = 3                           # tries per stage before the job fails
+backoff_base_seconds = 60.0                # retry delay = base * factor^(attempt - 1)
+backoff_factor = 4.0
+backoff_max_seconds = 3600.0               # longest wait between two tries
+lease_seconds = 300.0                      # a crashed worker's job is picked up after this
+stage_timeout_minutes = 360.0              # a stage running longer is stopped and retried;
+                                           # only awake time counts, not the PC's sleep (D-056)
+idle_poll_seconds = 5.0                    # how often an idle worker looks for new jobs
+stop_grace_seconds = 30.0                  # on stop, time a running stage gets to finish
+keep_awake = true                          # Windows does not sleep for being idle while a stage
+                                           # runs; a low battery still puts it to sleep (D-056)
+
+[stt]                                      # speech-to-text, local faster-whisper (D-003, D-036)
+provider = "faster_whisper"
+model = "large-v3-turbo"                   # measured best speed/quality on this PC (T-303)
+language = "hy"                            # Armenian (D-002)
+compute_type = "int8"
+cpu_threads = 0                            # 0 = automatic: all logical CPUs but 2
+beam_size = 1                              # 5 was slower and not better for Armenian (T-303)
+temperature_fallback = false               # true re-decodes unsure windows: up to 3x slower
+vad = true                                 # skip silences (voice activity detection)
+word_timestamps = false                    # true = word timings, +55 % transcription time
+initial_prompt = ""                        # extra vocabulary for all groups (see groups.toml)
+
+[llm]                                      # local LLM through Ollama (D-004)
+provider = "ollama"
+base_url = "http://127.0.0.1:11434"
+model = "gemma3:4b"                        # measured in T-304 (D-038)
+temperature = 0.2
+context_length = 8192                      # model context size, in tokens
+timeout_seconds = 600.0
+max_retries = 2
+use_igpu = true                            # use the integrated GPU (faster, frees the CPU)
+
+[cleaning.silence]                         # FR-6
+noise_db = -35.0                           # quieter than this counts as silence
+min_silence_seconds = 8.0                  # only longer silences are cut
+keep_seconds = 1.0                         # silence kept on each side of a cut
+require_static_video = true                # cut only if the picture is static too (D-014)
+freeze_noise = 0.003                       # picture-change threshold for "static"
+
+[cleaning.boundaries]                      # FR-7: lesson start and end (D-005)
+start_search_minutes = 30.0                # look for the start in the first N minutes
+end_search_minutes = 30.0                  # look for the end in the last N minutes
+anchor_window_minutes = 3.0                # a greeting at most this long before a topic opener
+fuzzy_threshold = 0.85                     # 1.0 = exact match only
+use_llm = true                             # let the LLM judge similar expressions
+greeting_phrases = [
+    "բարև ձեզ",
+    "բարև բոլորին",
+    "բարի երեկո",
+    "բարի օր",
+    "ողջույն",
+    "ողջունում եմ",
+    "hello everyone",
+    "good evening",
+]
+topic_phrases = [
+    "այսօր կխոսենք",
+    "այսօր խոսելու ենք",
+    "այսօր կանցնենք",
+    "այսօր անցնելու ենք",
+    "այսօրվա թեման",
+    "մեր այսօրվա թեման",
+    "այսօրվա դասի թեման",
+    "սկսենք դասը",
+    "today we will talk about",
+    "our topic for today",
+    "let's start",
+]
+closing_phrases = [
+    "այսօրվա համար այսքանը",
+    "այսքանը այսօրվա համար",
+    "այսօր այսքանը",
+    "շնորհակալություն ուշադրության համար",
+    "շնորհակալություն",
+    "կհանդիպենք",
+    "հաջորդ դասին",
+    "մինչ հանդիպում",
+    "ցտեսություն",
+    "that's all for today",
+    "see you next time",
+]
+
+[cleaning.empty_board]                     # FR-8, D-040: nobody at the board > 10 s -> keep 5 s
+enabled = true
+min_empty_seconds = 10.0
+keep_seconds = 5.0                         # half at each side of the stretch
+model = "yolox_tiny"                       # person detector in models/person (scripts/setup_person_model.py)
+person_score = 0.4                         # detection confidence that counts as a person
+min_person_height = 0.08                   # smaller figures (share of the frame height) are ignored
+sample_seconds = 1.0                       # one picture per second (keyframes when they are this dense)
+hwaccel = "auto"                           # "auto" = GPU decoding (d3d11va) if it works, "none" = CPU
+
+[cleaning.framing]                         # D-058: zoom to where the work happens (board, screen, wall)
+enabled = true
+margin = 0.03                              # space around the board, as a share of its size, each side
+min_margin = 0.015                         # ... and at least this share of the picture
+max_zoom = 2.0                             # 2x keeps full detail when 4K becomes 1080p
+min_gain = 0.05                            # no crop when it would keep more than 95 % of the width
+window_seconds = 60.0                      # one still picture of the room per minute is compared
+change_level = 12.0                        # how much the fine detail must change to count as work
+max_changed_share = 0.25                   # a bigger change is the camera or the lights: ignored
+min_work_share = 0.002                     # less work than this share of the picture: no crop
+
+[cleaning.cuts]                            # FR-10
+padding_seconds = 0.5                      # kept around each cut to avoid abrupt jumps
+min_keep_seconds = 2.0
+min_remove_seconds = 3.0
+fade_ms = 30                               # short audio fade at each cut
+
+[audio]                                    # FR-11
+loudness_target_lufs = -16.0
+true_peak_db = -1.5
+loudness_range = 11.0
+
+[render]                                   # NFR-4
+video_encoder = "auto"                     # "auto" = Intel Quick Sync (GPU) if it works, else "libx264"
+preset = "veryfast"                        # libx264
+crf = 21                                   # libx264: lower = better quality, bigger file
+qsv_quality = 26                           # h264_qsv: lower = better quality, bigger file (26: chalk readable, ~1.1 Mbps)
+audio_bitrate = "160k"
+max_height = 1080                          # 4K and larger are scaled down to 1080p; never up
+
+[metadata]                                 # FR-15 ... FR-18
+title_template = "{group} · Lecture {lesson}"   # placeholders: {group} {lesson} {date} {topic} (Q-13)
+description_footer = ""                    # placeholders: {group} {lesson} {date} {title}
+min_chapters = 3                           # YouTube needs at least 3 chapters
+min_chapter_seconds = 10.0                 # YouTube needs at least 10 s per chapter
+max_chapter_title_chars = 60
+window_minutes = 3.0                       # transcript window per LLM summary
+chapter_start_phrases = [                  # a chapter starts exactly at such a phrase (T-501)
+    "այսօր անցնելու ենք", "այսօր կանցնենք", "հիմա անցնենք", "անցնենք հաջորդ", "հաջորդ թեման",
+    "հիմա կխոսենք", "հիմա խոսենք", "սկսենք", "let's move on", "next topic",
+]
+thumbnail_enabled = true
+
+[consent]                                  # FR-20 ... FR-22 (D-008, D-019)
+provider = "file"                          # "file" = interim registry, "http" = Core Engine
+file_path = "config/consent.json"
+http_base_url = ""
+timeout_seconds = 15.0
+
+[auth]                                     # T-701: where the Google token is kept (never in TOML)
+store = "windows"                          # Windows Credential Manager; "file" = development only
+store_namespace = "Reel"                   # name prefix in the Credential Manager
+dev_file = "data/secrets.dev.json"         # used only when store = "file"
+
+[youtube]                                  # FR-23 ... FR-25. Privacy is always unlisted (D-017).
+mode = "dry-run"                           # "dry-run" = nothing is sent, "live" = publish
+category_id = "27"                         # Education
+default_language = "hy"
+create_missing_playlists = false           # Q-8
+delete_replaced_videos = false             # a re-run with a new file: keep the old video
+
+[slack]                                    # FR-26
+mode = "dry-run"
+# placeholders: {title} {url} {summary} {group} {lesson} {date} {duration}
+message_template = "🎬 {title}\n{summary}\n{url}"
+
+[classroom]                                # FR-27
+mode = "dry-run"
+post_type = "announcement"                 # or "material" (Q-9)
+text_template = "{title}\n{summary}"
+
+[library]                                  # FR-28 (D-008)
+provider = "local"                         # "local" = interim list inside Reel, "http" = Library API
+http_base_url = ""
+timeout_seconds = 15.0
+
+[notifications]                            # FR-33: staff alerts in Slack
+mode = "dry-run"
+slack_channel = ""                         # staff channel ID; required when mode = "live"
+events = ["failed", "on_hold", "flagged"]
+
+[web]                                      # staff dashboard (FR-30)
+host = "127.0.0.1"
+port = 8080
+base_url = "http://127.0.0.1:8080"         # used for links in notifications
+session_hours = 12.0
+upload_max_gb = 20.0                       # largest file staff can upload in the dashboard
+
+[schedule]
+timezone = "Asia/Yerevan"
+same_evening_cutoff = 23:59:00             # links posted before this time count as "same evening" (Q-3)
+
+[retention]                                # NFR-6 (Q-11, D-021)
+working_files_days = 30                    # audio, cleaned video; 0 = keep forever
+transcripts_days = 365                     # 0 = keep forever
+delete_source_recordings = false           # never delete the originals unless set to true
+source_recordings_days = 90                # used only when delete_source_recordings = true
+
+[budget]                                   # NFR-8 (D-020)
+max_processing_minutes = 240.0             # alert when one recording takes longer
+
+[logging]                                  # NFR-7
+level = "INFO"                             # written to the log files: DEBUG, INFO, WARNING, ERROR
+console_level = "INFO"                     # shown in the terminal by long-running commands
+file_max_mb = 10.0                         # logs/reel-<role>.jsonl is rotated at this size
+file_backups = 10                          # rotated files kept (.1 ... .10)
+job_logs = true                            # also write data/jobs/<job id>/job.log
+# Third-party libraries whose messages are shown from WARNING up only.
+quiet_loggers = ["urllib3", "httpx", "httpcore", "googleapiclient.discovery_cache"]

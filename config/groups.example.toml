@@ -1,0 +1,16 @@
+# Group mapping (FR-34). Copy to config/groups.toml (or run `reel config init`).
+#
+# One [groups."<name>"] table per group. A recording belongs to the group whose name
+# (or alias) matches its folder inside a watched folder:
+#     <watched folder>/<group folder>/<recording file>          (D-018)
+# Matching ignores letter case and treats spaces, "_" and "-" alike.
+# IDs may stay empty while the matching integration runs in dry-run mode.
+
+[groups."Python 12"]
+aliases = ["Py12"]                 # other folder names that mean this group
+youtube_playlist_id = ""           # YouTube playlist ID (starts with PL...)
+slack_channel = ""                 # Slack channel ID (for example C0123456789)
+classroom_course_id = ""           # Google Classroom course ID
+core_engine_group_id = ""          # the group's ID in the Core Engine; empty = use the group name
+# Words that help speech recognition: technical terms, names (used as a Whisper prompt).
+vocabulary = "Python, list, dictionary, tuple, set, loop, for, while, function, class, print, input"

@@ -1,0 +1,9 @@
+{
+  "Example Group": {
+    "group_ref": "demo-group-1",
+    "students": [
+      {"id": "demo-student-1", "status": "granted"},
+      {"id": "demo-student-2", "status": "unknown"}
+    ]
+  }
+}

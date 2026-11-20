@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block head %}<meta http-equiv="refresh" content="{{ refresh }}">{% endblock %}
+{% block title %}Ձայնագրություններ{% endblock %}
+{% block content %}
+<h1>Ձայնագրություններ</h1>
+
+<ul class="counts" aria-label="Վիճակներ">
+  <li class="count{% if not status %} chosen{% endif %}">
+    <a href="/?group={{ group | urlencode }}">
+      <span class="number">{{ listing.total }}</span>
+      <span class="label">Բոլորը</span>
+    </a>
+  </li>
+  {% for each, number in listing.counts.items() %}
+  <li class="count status-{{ each.value }}{% if status == each.value %} chosen{% endif %}">
+    <a href="/?status={{ each.value }}&amp;group={{ group | urlencode }}">
+      <span class="number">{{ number }}</span>
+      <span class="label">{{ status_label(each) }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+
+<form class="filters" method="get" action="/">
+  <label for="status">Վիճակ</label>
+  <select id="status" name="status">
+    <option value="">Բոլորը</option>
+    {% for each in listing.counts %}
+    <option value="{{ each.value }}"{% if status == each.value %} selected{% endif %}>{{ status_label(each) }}</option>
+    {% endfor %}
+  </select>
+  <label for="group">Խումբ</label>
+  <select id="group" name="group">
+    <option value="">Բոլորը</option>
+    <option value="{{ no_group }}"{% if group == no_group %} selected{% endif %}>Առանց խմբի</option>
+    {% for name in listing.groups %}
+    <option value="{{ name }}"{% if group == name %} selected{% endif %}>{{ name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Ցուցադրել</button>
+  <span class="muted">Էջը թարմանում է ամեն {{ refresh }} վայրկյանը մեկ։</span>
+</form>
+
+{% if not listing.rows %}
+<p class="card muted">Այս ընտրությամբ ձայնագրություն չկա։</p>
+{% else %}
+<div class="table">
+<table>
+  <thead>
+    <tr>
+      <th>Ձայնագրություն</th>
+      <th>Փուլեր</th>
+      <th>Վիճակ</th>
+      <th>Տևողություն</th>
+      <th>Ժամանակ</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in listing.rows %}
+    <tr class="job status-{{ row.status.value }}">
+      <td>
+        <a class="title" href="/recordings/{{ row.job_id }}">{{ row.title }}</a>
+        <div class="muted small">#{{ row.job_id }} · {{ row.file_name }}</div>
+        {% if row.flags %}
+        <ul class="flags">
+          {% for code, label in row.flags %}<li class="flag" title="{{ code }}">{{ label }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+      </td>
+      <td>
+        <ol class="pills">
+          {% for pill in row.pills %}<li class="pill pill-{{ pill.state }}" title="{{ pill.title }}">{{ pill.label }}</li>{% endfor %}
+        </ol>
+        {% if row.problem %}<p class="problem">{{ row.problem }}</p>{% endif %}
+      </td>
+      <td><span class="badge status-{{ row.status.value }}">{{ row.status_label }}</span></td>
+      <td class="nowrap">
+        {% if row.original %}{{ row.original }}{% if row.final %} → {{ row.final }}{% endif %}{% else %}—{% endif %}
+      </td>
+      <td class="nowrap small">
+        <div>Ավելացվել է՝ {{ row.created }}</div>
+        <div class="muted">Թարմացվել է՝ {{ row.updated }}</div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if listing.pages > 1 %}
+<nav class="pager">
+  {% if listing.page > 1 %}<a href="/?status={{ status }}&amp;group={{ group | urlencode }}&amp;page={{ listing.page - 1 }}">← Նախորդ</a>{% endif %}
+  <span>Էջ {{ listing.page }} / {{ listing.pages }} ({{ listing.matching }})</span>
+  {% if listing.page < listing.pages %}<a href="/?status={{ status }}&amp;group={{ group | urlencode }}&amp;page={{ listing.page + 1 }}">Հաջորդ →</a>{% endif %}
+</nav>
+{% endif %}
+{% endif %}
+{% endblock %}

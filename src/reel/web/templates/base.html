@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="hy">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="same-origin">
+  {% block head %}{% endblock %}
+  <title>{% block title %}Reel{% endblock %} · Reel</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/">Reel</a>
+    {% if user %}
+    <nav class="menu">
+      <a class="nav-link{% if request.url.path == '/' or request.url.path.startswith('/recordings/') %} is-active{% endif %}" href="/">Ձայնագրություններ</a>
+      <a class="nav-link{% if request.url.path == '/upload' %} is-active{% endif %}" href="/upload">Վերբեռնել</a>
+      <a class="nav-link{% if request.url.path == '/metrics' %} is-active{% endif %}" href="/metrics">Չափումներ</a>
+    </nav>
+    <form class="logout" method="post" action="/logout">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <span class="who">{{ user.name }}</span>
+      <button type="submit" class="link">Ելք</button>
+    </form>
+    {% endif %}
+  </header>
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="bottom">Reel {{ version }}</footer>
+</body>
+</html>

@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}{{ d.title }}{% endblock %}
+{% block content %}
+<p><a href="/">← Ձայնագրություններ</a></p>
+<h1>{{ d.title }}</h1>
+<p class="muted small">#{{ d.job_id }} · {{ d.source_path }}</p>
+
+{% if message %}<p class="notice" role="status">{{ message }}</p>{% endif %}
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <ol class="pills big">
+    {% for pill in d.pills %}<li class="pill pill-{{ pill.state }}" title="{{ pill.title }}">{{ pill.label }}</li>{% endfor %}
+  </ol>
+  <p><span class="badge status-{{ d.status.value }}">{{ d.status_label }}</span>
+    {% if d.waiting_retry %}<span class="muted">· նոր փորձը՝ {{ d.next_attempt }}</span>{% endif %}
+    {% if d.finished %}<span class="muted">· ավարտվել է՝ {{ d.finished }}</span>{% endif %}
+  </p>
+  {% if d.hold_reason %}<p class="hold"><strong>{{ d.hold_label }}</strong>{% if d.hold_message %}<br>{{ d.hold_message }}{% endif %}</p>{% endif %}
+  {% if d.last_error and d.status.value in ("failed", "queued") %}<p class="problem">{{ d.last_error }}</p>{% endif %}
+  {% if d.flags %}<ul class="flags">{% for code, label in d.flags %}<li class="flag" title="{{ code }}">{{ label }}</li>{% endfor %}</ul>{% endif %}
+  <dl class="facts">
+    <dt>Խումբ</dt><dd>{{ d.group or "—" }}</dd>
+    <dt>Դաս</dt><dd>{{ d.lesson if d.lesson is not none else "—" }}</dd>
+    <dt>Ամսաթիվ</dt><dd>{{ d.date or "—" }}</dd>
+    <dt>Տևողություն</dt><dd>{{ d.original or "—" }}{% if d.final %} → {{ d.final }}{% endif %}</dd>
+    <dt>Ավելացվել է</dt><dd>{{ d.created }}</dd>
+  </dl>
+</section>
+
+{% if video %}
+<section class="card">
+  <h2>Տեսանյութ</h2>
+  <video class="player" controls preload="metadata" src="/recordings/{{ d.job_id }}/video"{% if d.metadata and d.metadata.has_thumbnail %} poster="/recordings/{{ d.job_id }}/thumbnail"{% endif %}></video>
+  <p class="small"><a href="/recordings/{{ d.job_id }}/video?download=1" download>Ներբեռնել (MP4)</a>
+    {% if not on_youtube %}· <span class="muted">Տեսանյութը YouTube-ում չէ. այն միայն այս համակարգչում է և ավտոմատ չի ջնջվի։</span>{% endif %}</p>
+</section>
+{% endif %}
+
+<section class="card actions">
+  <h2>Գործողություններ</h2>
+  {% if d.can_release %}
+  <form method="post" action="/recordings/{{ d.job_id }}/release">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label for="release-note">Նշում (ըստ ցանկության)</label>
+    <input id="release-note" name="note" maxlength="1000">
+    <div class="buttons">
+      <button type="submit" name="advance" value="1">Ընդունել և շարունակել</button>
+      <button type="submit" name="advance" value="0" class="secondary">Կրկին ստուգել (փուլը նորից)</button>
+    </div>
+  </form>
+  {% endif %}
+
+  {% if d.can_identify %}
+  <form method="post" action="/recordings/{{ d.job_id }}/identify">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <h3>Խումբ և դաս</h3>
+    <div class="row">
+      <label>Խումբ
+        <input name="group" list="known-groups" required maxlength="100" autocomplete="off" value="{{ d.group or '' }}">
+      </label>
+      <label>Դասի համար <input name="lesson" type="text" inputmode="numeric" maxlength="5" autocomplete="off" value="{{ d.lesson if d.lesson is not none else '' }}"></label>
+      <label>Ամսաթիվ <input name="recorded" type="date" value="{{ d.date }}"></label>
+    </div>
+    <datalist id="known-groups">{% for name in groups %}<option value="{{ name }}"></option>{% endfor %}</datalist>
+    <button type="submit">Պահպանել</button>
+    {% if d.status.value == "done" %}<p class="muted small">Արդեն հրապարակված տեսանյութի համար նոր վերնագրի և հղումների համար վերագործարկեք «Գլուխներ» փուլից։</p>{% endif %}
+  </form>
+  {% endif %}
+
+  {% if d.can_rerun %}
+  <form method="post" action="/recordings/{{ d.job_id }}/rerun">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <h3>Վերագործարկել</h3>
+    <div class="row">
+      <label>Սկսած փուլից
+        <select name="stage">
+          {% for value, label in d.rerun_stages %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Նշում <input name="note" maxlength="1000"></label>
+    </div>
+    <button type="submit">Վերագործարկել</button>
+  </form>
+  {% endif %}
+
+  {% if d.can_retry_now %}
+  <form method="post" action="/recordings/{{ d.job_id }}/retry">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <button type="submit">Փորձել հիմա</button>
+  </form>
+  {% endif %}
+
+  {% if d.can_cancel %}
+  <form method="post" action="/recordings/{{ d.job_id }}/cancel" class="danger">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <h3>Չեղարկել</h3>
+    <p class="muted small">Ոչինչ չի հրապարակվի։ Ավելի ուշ կարելի է վերագործարկել։</p>
+    <div class="row"><label>Պատճառ <input name="note" maxlength="1000"></label></div>
+    <button type="submit" class="danger">Չեղարկել job-ը</button>
+  </form>
+  {% endif %}
+</section>
+
+{% if d.cut %}
+<section class="card">
+  <h2>Ձայնագրություն՝ {{ d.cut.original }}, կրճատված մինչև {{ d.cut.final }}</h2>
+  <p class="muted small">Կապույտը պահված է, մոխրագույնը՝ ավտոմատ հեռացված (կտրման ցուցակ, տարբերակ {{ d.cut.version }})։</p>
+  <svg class="cutbar" viewBox="0 0 1000 24" preserveAspectRatio="none" role="img" aria-label="Կտրման ցուցակ">
+    {% for b in d.cut.bars %}<rect x="{{ b.x }}" y="0" width="{{ b.width }}" height="24" class="{{ 'kept' if b.kept else 'removed' }}"><title>{{ b.span }} · {{ 'պահված' if b.kept else b.reason }}</title></rect>{% endfor %}
+  </svg>
+  {% if d.cut.removed %}
+  <ul class="reasons">{% for reason, total in d.cut.removed %}<li>{{ reason }}՝ {{ total }}</li>{% endfor %}</ul>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if d.metadata %}
+<section class="grid">
+  <div class="card">
+    <h2>Գլուխներ</h2>
+    {% if d.metadata.chapters %}
+    <ol class="chapters">{% for at, name in d.metadata.chapters %}<li><span class="at">{{ at }}</span> {{ name }}</li>{% endfor %}</ol>
+    {% else %}<p class="muted">Գլուխներ չկան։</p>{% endif %}
+  </div>
+  <div class="card">
+    {% if d.metadata.has_thumbnail %}<img class="thumb" src="/recordings/{{ d.job_id }}/thumbnail" alt="Տեսանյութի նկարը">{% endif %}
+    <h2>{{ d.metadata.title }}</h2>
+    {% if d.metadata.summary %}<p>{{ d.metadata.summary }}</p>{% endif %}
+    <details><summary>Նկարագրություն</summary><pre class="text">{{ d.metadata.description }}</pre></details>
+  </div>
+</section>
+{% endif %}
+
+<section class="card table table-panel">
+  <h2>Հրապարակում</h2>
+  <table>
+    <thead><tr><th>Որտեղ</th><th>Վիճակ</th><th>Հղում</th><th>Փորձեր</th><th>Սխալ</th></tr></thead>
+    <tbody>
+      {% for p in d.publications %}
+      <tr>
+        <td>{{ p.target }}</td>
+        <td>{{ p.status_label }}{% if p.dry_run %} <span class="tag">dry-run (նախադիտում)</span>{% endif %}{% if p.skipped %}<div class="muted small">{{ p.skipped }}</div>{% endif %}</td>
+        <td>{% if p.url %}<a href="{{ p.url }}" rel="noopener noreferrer" target="_blank">բացել</a>{% elif p.external_id %}{{ p.external_id }}{% else %}—{% endif %}</td>
+        <td>{{ p.attempts }}</td>
+        <td class="small">{{ p.error }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if d.consent %}
+<section class="card table table-panel">
+  <h2>Համաձայնության ստուգումներ</h2>
+  <table>
+    <thead><tr><th>Երբ</th><th>Արդյունք</th><th>Համաձայն / ոչ / անհայտ</th><th>Աշխատակցի որոշում</th></tr></thead>
+    <tbody>
+      {% for c in d.consent %}
+      <tr>
+        <td class="nowrap">{{ c.at }}<div class="muted small">{{ c.provider }}</div></td>
+        <td>{{ c.result_label }}{% if c.message %}<div class="muted small">{{ c.message }}</div>{% endif %}</td>
+        <td>{{ c.granted }} / {{ c.denied }} / {{ c.unknown }}</td>
+        <td>{% if c.released_by %}{{ c.released_by }}, {{ c.released_at }}{% if c.release_note %}<div class="small">{{ c.release_note }}</div>{% endif %}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if d.cost %}
+<section class="card">
+  <h2>Ծախս և ժամանակ</h2>
+  <p>Մշակում՝ <strong>{{ clock(d.cost.processing_seconds) or "0:00" }}</strong>
+    (բյուջե՝ {{ "%g"|format(d.budget_minutes) }} րոպե)
+    {% if d.cost.over_budget %}<span class="badge status-failed">Բյուջեից ավել</span>{% endif %}</p>
+  <dl class="facts">
+    <dt>Whisper (տառադարձում)</dt><dd>{{ clock(d.cost.whisper_seconds) or "—" }}</dd>
+    <dt>Մոնտաժ (render)</dt><dd>{{ clock(d.cost.render_seconds) or "—" }}</dd>
+    <dt>LLM</dt><dd>{{ clock(d.cost.llm_seconds) or "—" }} · {{ d.cost.llm_calls }} հարցում · {{ d.cost.prompt_tokens + d.cost.output_tokens }} token</dd>
+    {% if d.cost.file_to_links_minutes is not none %}<dt>Ֆայլից մինչև հղումներ</dt><dd>{{ clock(d.cost.file_to_links_minutes * 60) }}{% if d.cost.same_evening %} · նույն երեկոյան{% endif %}</dd>{% endif %}
+  </dl>
+  {% if d.cost.stage_seconds %}
+  <ul class="reasons">{% for stage, seconds in d.cost.stage_seconds.items() %}<li>{{ stage_label(stage) }}՝ {{ clock(seconds) or "0:00" }} ({{ d.cost.attempts[stage] }} փորձ)</li>{% endfor %}</ul>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card table table-panel">
+  <h2>Փուլերի պատմություն</h2>
+  {% if d.runs %}
+  <table>
+    <thead><tr><th>Փուլ</th><th>Փորձ</th><th>Արդյունք</th><th>Սկիզբ</th><th>Տևողություն</th><th>Սխալ</th></tr></thead>
+    <tbody>
+      {% for r in d.runs %}
+      <tr class="run-{{ r.status }}">
+        <td>{{ r.stage }}</td><td>{{ r.attempt }}</td><td>{{ r.status_label }}</td>
+        <td class="nowrap">{{ r.started }}</td><td>{{ r.seconds }}</td><td class="small">{{ r.error }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">Դեռ ոչ մի փուլ չի աշխատել։</p>{% endif %}
+</section>
+
+{% if d.transcript %}
+<section class="card">
+  <h2>Տառադարձում {% if d.transcript_kind == "clean" %}(մաքրված տեսանյութի ժամանակներով){% endif %}</h2>
+  <ol class="transcript">{% for at, text in d.transcript %}<li><span class="at">{{ at }}</span> {{ text }}</li>{% endfor %}</ol>
+  {% if d.transcript_total > d.transcript|length %}<p class="muted small">Ցույց է տրված {{ d.transcript|length }}-ը {{ d.transcript_total }} հատվածից։</p>{% endif %}
+</section>
+{% endif %}
+
+<section class="card table table-panel">
+  <h2>Իրադարձություններ</h2>
+  <table>
+    <thead><tr><th>Երբ</th><th>Ինչ</th><th>Ով</th><th>Մանրամասներ</th></tr></thead>
+    <tbody>
+      {% for e in d.events %}
+      <tr>
+        <td class="nowrap">{{ e.at }}</td>
+        <td>{{ e.kind }}{% if e.stage %}<div class="muted small">{{ e.stage }}</div>{% endif %}</td>
+        <td>{{ e.actor }}{% if e.name %}<div class="muted small">{{ e.name }}</div>{% endif %}</td>
+        <td class="small">{{ e.message }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
