@@ -44,16 +44,28 @@ or PowerShell.
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts\network.ps1 allow
    ```
-   The rule applies only to *private* networks. `scripts\network.ps1 status` shows whether
-   this computer's network is private; a home or school network that Windows marked as
-   *Public* must be set to *Private* (Settings › Network & internet › the network › Network
-   profile type).
+   The rule applies only to *private* networks, and only to computers of the same subnet.
+   `scripts\network.ps1 status` shows whether this computer's network is private.
+   - A school's shared Wi-Fi is usually *Public*, and should stay so: other people use it
+     too. Then open only Reel's port, only to that network's address range, and leave the
+     network public:
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File scripts\network.ps1 allow -Subnet 192.168.32.0/22
+     ```
+     The range comes from this computer's address and prefix (`Get-NetIPAddress -AddressFamily
+     IPv4`): for example 192.168.33.109 with prefix 22 is 192.168.32.0/22.
+   - On your own network, you can instead set it to *Private* (Settings › Network & internet ›
+     the network › Network profile type).
+   - Open the firewall **before** Reel starts with `host = "0.0.0.0"`. Otherwise Windows may
+     ask about Python, and pressing *Cancel* there, or leaving *Public* unticked, makes a rule
+     that blocks Python and wins over Reel's rule. `status` lists such rules.
 5. **Trust the CA on this computer too**, so its own browser has no warning: see step 2.
 6. **Start Reel** again (`.venv\Scripts\reel serve`, or `scripts\autostart.ps1 start`). The
    log says `dashboard on https://0.0.0.0:8080; staff open https://…`.
-   - If Windows Firewall asks whether Python may communicate, allow it on **private**
-     networks. Pressing *Cancel* makes a rule that blocks Python; `scripts\network.ps1 status`
-     shows such rules.
+   - If Windows Firewall still asks whether Python may communicate, run
+     `scripts\network.ps1 status` after answering. If it lists a rule that blocks Python,
+     delete that rule in *Windows Defender Firewall with Advanced Security* › *Inbound Rules*:
+     it wins over Reel's rule.
 
 ## 2. On every staff computer (once)
 
