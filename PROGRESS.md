@@ -232,7 +232,15 @@ ruff clean) and what was run on this PC.
   - installing `reel-ca.crt` on this computer and on the staff computers.
   - The script was parse-checked only.
 - **Guide:** `docs/setup/network.md`; README and `config/reel.example.toml` updated.
-- **Checks:** full suite 1254 passed with `-W error`; ruff check and format are clean (183 files). Not committed: the user commits when they say.
+- **Checks:** full suite 1254 passed with `-W error`; ruff check and format are clean (183 files).
+- **Follow-up (20:05, the user: "commit, and do the remaining steps"):**
+  - Committed `3e8c007`.
+  - `network.ps1 allow` ran elevated after the user approved UAC, and added the private-only rule.
+  - `status` then showed that the "Picsart Academy" Wi-Fi is **Public**, so that rule does not apply there. Making the shared Wi-Fi private would loosen the whole laptop's firewall on a network that students use too.
+  - So `allow -Subnet <range>` was added: only Reel's port, only from that range (here 192.168.32.0/22, from 192.168.33.109/22), and the network stays public. The guide now says to open the firewall before Reel listens on 0.0.0.0. Committed `5ff0ebd`.
+  - Running `allow -Subnet` was refused to the agent, because it opens a port on a public network. The user runs it.
+  - Installing the CA in the user's root store needs a Windows confirmation dialog, which the agent's shell cannot show ("UI is not allowed"). The user installs it.
+  - Reel is not started yet: it should start after the firewall rule exists.
 
 ### 2026-11-20 18:55 — T-1007 reviewed (DONE); the project became a local git repository
 - **GPT's work (handoff/T-1007.report.md):** `style.css` rewritten as one dark palette in `:root` (41 variables, the user's 14 with their exact values). `base.html` got `nav-link` / `is-active` (the active page is underlined in magenta). `recording.html` and `metrics.html` got `table table-panel` on their table cards. Nothing else changed.
