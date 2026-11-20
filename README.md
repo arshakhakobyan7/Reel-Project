@@ -96,7 +96,8 @@ Any setting can be changed for one run with an environment variable named
 
 `reel serve` starts all of Reel:
 
-- the dashboard at <http://127.0.0.1:8080>;
+- the dashboard at <http://127.0.0.1:8080> (only this computer; to open it from staff
+  computers over HTTPS, see [docs/setup/network.md](docs/setup/network.md));
 - the folder watcher;
 - the workers;
 - staff alerts;
@@ -161,6 +162,7 @@ the share done without staff, failures per stage and compute time. The time budg
 | `reel rerun <job> --from <stage> --by <name>` | Run a job again from a stage. The stages are `import`, `transcribe`, `clean`, `chapters`, `consent`, `upload` and `post`. |
 | `reel release <job> [--accept]` / `reel cancel <job>` / `reel retry <job>` | The dashboard's actions, with `--by` and `--note` for the audit log. |
 | `reel user add/password/disable/enable/list` | Dashboard accounts. |
+| `reel cert [--name N] [--ip A] [--new-ca] [--show]` | The dashboard's HTTPS certificate for the local network (make, renew, show). |
 | `reel auth google` / `status [--check]` / `forget` | Connect to Google once, check the connection, or remove it. |
 | `reel cleanup [--dry-run]` | Retention, by hand. |
 | `reel config init/check/show`, `reel db init/status/upgrade` | Setup and maintenance. |
@@ -195,7 +197,7 @@ the share done without staff, failures per stage and compute time. The time budg
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Architecture |
 | [CHANGELOG.md](CHANGELOG.md) | Changes |
 | [THIRD_PARTY.md](THIRD_PARTY.md) | Every dependency and its free licence |
-| [docs/setup/](docs/setup/) | Google setup, autostart |
+| [docs/setup/](docs/setup/) | Google setup, autostart, the dashboard on the network (HTTPS) |
 | [docs/integrations/](docs/integrations/) | Contracts for the Core Engine, the Academy Library and Reel's own API |
 | [docs/](docs/) | PRD (English and Armenian) and the original brief |
 

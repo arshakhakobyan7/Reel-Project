@@ -19,7 +19,7 @@ import os
 import re
 import socket
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from reel.config.loader import LoadedConfig
@@ -89,6 +89,7 @@ class Runtime:
         host: str | None = None,
         port: int | None = None,
         secret: str | None = None,
+        tls: Mapping[str, str] | None = None,
         cleanup_delay: float = 600.0,
     ) -> None:
         self.db, self.config = db, config
@@ -96,6 +97,7 @@ class Runtime:
         self.parts = parts or Parts()
         self.registry = registry
         self.host, self.port, self.secret = host, port, secret
+        self.tls = tls  # uvicorn's ssl_* options; None = from web.tls (T-1008)
         self.stopping = threading.Event()
         self.threads: list[threading.Thread] = []
         self.worker: Worker | None = None
@@ -158,10 +160,15 @@ class Runtime:
 
         app = create_app(self.db, self.config, self.secret or session_secret(cfg))
         web = cfg.settings.web
+        tls = self.tls
+        if tls is None:
+            from reel.web.tls import uvicorn_options
+
+            tls = uvicorn_options(cfg) if web.tls else {}
         self.server = uvicorn.Server(
             uvicorn.Config(
                 app, host=self.host or web.host, port=self.port or web.port, log_config=None,
-                server_header=False, date_header=False, lifespan="off",
+                server_header=False, date_header=False, lifespan="off", **tls,
             )
         )  # fmt: skip
         self._thread("web", self.server.run)  # not the main thread: uvicorn leaves signals alone

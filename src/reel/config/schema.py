@@ -476,6 +476,13 @@ class WebSettings(Section):
     base_url: str = Field(default="http://127.0.0.1:8080", pattern=_HTTP_URL.pattern)
     session_hours: float = Field(default=12.0, gt=0, le=720)
     upload_max_gb: float = Field(default=20.0, gt=0, le=500)  # per file (T-807)
+    tls: bool = False  # HTTPS with the certificate made by `reel cert` (T-1008, D-060)
+
+    @model_validator(mode="after")
+    def _https_with_tls(self) -> Self:
+        if self.tls and not self.base_url.startswith("https://"):
+            raise ValueError("tls = true needs an https:// base_url (the address staff open)")
+        return self
 
 
 class ScheduleSettings(Section):

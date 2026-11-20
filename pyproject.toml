@@ -21,6 +21,7 @@ dependencies = [
     "jinja2>=3.1",          # BSD-3-Clause - server-rendered pages (T-802)
     "python-multipart>=0.0.18",  # Apache-2.0 - HTML form parsing (T-802)
     "uvicorn>=0.32",        # BSD-3-Clause - web server for `reel serve` (T-802)
+    "cryptography>=44",     # Apache-2.0 OR BSD-3-Clause - HTTPS certificate (T-1008)
 ]
 
 [project.optional-dependencies]

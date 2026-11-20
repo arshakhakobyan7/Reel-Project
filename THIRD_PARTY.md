@@ -17,6 +17,8 @@ in turn.
 | jinja2 | 3.1.6 | BSD-3-Clause | dashboard pages |
 | markupsafe | 3.0.4 | BSD-3-Clause | used by Jinja2 (escaping) |
 | python-multipart | 0.0.34 | Apache-2.0 | HTML form parsing |
+| cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause | the dashboard's HTTPS certificate and its local CA (`reel cert`) |
+| cffi, pycparser | 2.1.1, 3.12 | MIT-0, BSD-3-Clause | used by cryptography |
 | pydantic / pydantic-core | 2.14.3 / 2.50.4 | MIT | configuration validation, LLM answer schemas |
 | annotated-types, typing-inspection, typing-extensions | 0.8.0, 0.4.5, 4.16.0 | MIT, MIT, PSF-2.0 | used by pydantic and others |
 | annotated-doc, opentelemetry-api | 0.0.7, 1.45.2 | MIT, Apache-2.0 | used by FastAPI |

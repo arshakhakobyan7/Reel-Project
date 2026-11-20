@@ -223,6 +223,8 @@ port = 8080
 base_url = "http://127.0.0.1:8080"         # used for links in notifications
 session_hours = 12.0
 upload_max_gb = 20.0                       # largest file staff can upload in the dashboard
+tls = false                                # true = HTTPS with the certificate from `reel cert`;
+                                           # needs an https:// base_url (docs/setup/network.md)
 
 [schedule]
 timezone = "Asia/Yerevan"

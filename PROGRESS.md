@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (dry-run; publishing stays local until the user says). 49 of 51 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (dry-run; publishing stays local until the user says). 50 of 52 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1007 — Dashboard design, by GPT, reviewed (2026-11-20 18:55) |
-| **Current task** | — (the user checks the new design in the running server) |
+| **Last completed task** | T-1008 — The dashboard on the local network over HTTPS (2026-11-20 19:50) |
+| **Current task** | — (the user opens the firewall port, starts Reel and checks the design and HTTPS) |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
 | **Waiting for approval** | Since 2026-11-20 14:10: report after each task and wait for the user's OK before the next. |
@@ -207,6 +207,32 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-20 19:50 — T-1008 The dashboard on the local network over HTTPS (user request, D-060) — DONE
+- **Request:** "make the HTTPS setup so staff can sign in from the network".
+- **How:** see D-060. Reel serves HTTPS itself, with a certificate from its own CA. The CA is limited by name constraints to this computer's names and private addresses. The keys are encrypted, and their password is in Windows Credential Manager.
+- **Code:**
+  - `src/reel/web/tls.py` (new): names and addresses of this computer, the CA, the server certificate, renewal, `read`, `uvicorn_options`;
+  - `reel cert [--name] [--ip] [--new-ca] [--show]` in `web/commands.py`; `reel serve` passes the TLS options and logs the address staff open;
+  - `Runtime(tls=…)`; `[web] tls` with a check that it has an `https://` `base_url`;
+  - `scripts/network.ps1 allow|remove|status`: a Windows Firewall rule for private networks only, and a warning about rules that block Python.
+- **Dependency:** `cryptography` 50.0.2 (Apache-2.0 OR BSD-3-Clause), with `cffi` and `pycparser`; in `pyproject.toml` and THIRD_PARTY.md.
+- **Tests:** `test_tls.py` (14), with real TLS handshakes checked by OpenSSL:
+  - every name and address opens; other names are refused;
+  - **the CA cannot sign another site** (`X509_V_ERR_PERMITTED_VIOLATION`);
+  - keys are encrypted; a renewal keeps the CA; a new CA when asked, after a rename, or near its end;
+  - validity, the key password in the secret store, the serve checks, `reel cert`;
+  - the dashboard answers over HTTPS with a `Secure` cookie, and plain HTTP gets nothing.
+- **On this computer:**
+  - `reel cert` made the CA (until 2036-11-17; SHA-1 thumbprint `AA:04:0C:14:35:0B:D1:DB:49:25:A3:F9:7E:A2:E1:C6:F2:7A:67:6D`) and the certificate (until 2027-12-22) for `desktop-3gig9mv`, `.local`, `localhost`, 127.0.0.1, 172.23.208.1 and 192.168.33.109.
+  - `config/reel.toml`: `host = "0.0.0.0"`, `tls = true`, `base_url = "https://desktop-3gig9mv:8080"`.
+  - Smoke test on 127.0.0.1:8093: all five names answered 200 over TLS 1.3 with a `Secure` cookie; `example.com` was refused.
+- **Not done by the agent** (the firewall change was refused to the agent; it needs the user's administrator rights):
+  - `scripts\network.ps1 allow` as administrator;
+  - installing `reel-ca.crt` on this computer and on the staff computers.
+  - The script was parse-checked only.
+- **Guide:** `docs/setup/network.md`; README and `config/reel.example.toml` updated.
+- **Checks:** full suite 1254 passed with `-W error`; ruff check and format are clean (183 files). Not committed: the user commits when they say.
 
 ### 2026-11-20 18:55 — T-1007 reviewed (DONE); the project became a local git repository
 - **GPT's work (handoff/T-1007.report.md):** `style.css` rewritten as one dark palette in `:root` (41 variables, the user's 14 with their exact values). `base.html` got `nav-link` / `is-active` (the active page is underlined in magenta). `recording.html` and `metrics.html` got `table table-panel` on their table cards. Nothing else changed.

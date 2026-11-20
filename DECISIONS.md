@@ -64,6 +64,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-057 | A Done video that is not on YouTube is never removed by retention; the recording page plays and downloads the cleaned video | user + agent | Accepted |
 | D-058 | Board framing: the whole board and all the work stay in the picture, with a small margin; one crop per camera; applied in the render | user + agent | Accepted |
 | D-059 | The LLM never cuts the lesson's start or end alone: the line it names must hold a configured phrase | user | Accepted |
+| D-060 | The dashboard on the local network: HTTPS from Reel itself, with its own name-constrained CA | user + agent | Accepted |
 
 ---
 
@@ -587,4 +588,21 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 - **What happened:** the recording starts right when the teaching starts, with a recap of the previous lesson and no greeting. The local LLM (Gemma 3 4B) named an ordinary teaching line, "now let's take an example", as the lecturer's greeting. Its quote was really in that line, so it passed the quote check (D-039), and the first 2:48 of the lesson were cut as "before the lesson".
 - **The user's rule:** a lesson does not always start with a phrase that announces it. A recording may start right as the teaching starts, and then nothing may be cut.
 - **Decision:** the line the LLM names, for the start or for the end, must also hold one of the configured phrases (greeting, topic opener or closing, with the same fuzzy matching). Otherwise the answer is rejected: nothing is cut, and the job gets the "lesson start/end not found" flag. The LLM still chooses between phrase candidates, for example a lecturer's greeting without a topic opener after it. A teacher's own way of greeting is added to the phrase lists in `config/reel.toml`.
+
+### D-060 — The dashboard on the local network (HTTPS)
+- **Date:** 2026-11-20 · **Source:** the user ("make the HTTPS setup so staff can sign in from the network"), agent (T-1008) · **Status:** Accepted
+- **Need:** staff open the dashboard from their own computers on the school's network. Passwords and session cookies must not cross the network in clear text. There is no public domain, and everything must be free (D-009).
+- **Decision:** Reel serves HTTPS itself (uvicorn's TLS), with a certificate from its own small CA.
+  - `reel cert` makes the CA once (10 years) and a server certificate (397 days, the browsers' limit) for this computer's name, `<name>.local`, `localhost`, 127.0.0.1 and its private IPv4 addresses. `--name` and `--ip` add more.
+  - The CA has **critical name constraints**: it may sign only those names and the private IPv4 ranges. A stolen CA key cannot be used against any other site on the staff computers that trust it. A test proves that OpenSSL refuses a certificate it signs for another name (`X509_V_ERR_PERMITTED_VIOLATION`).
+  - Both keys are EC P-256, stored encrypted (PKCS#8) in `data/tls/`, git-ignored. Their password is random and kept in the secret store (Windows Credential Manager, D-047).
+  - A renewal keeps the CA, so staff computers trust it only once. A new CA is made only with `--new-ca`, when the computer's name is not covered any more, or when the CA ends within 30 days.
+  - `[web] tls = true` turns it on; it needs an `https://` `base_url`, so the session cookie gets `Secure` (D-049). `reel serve` checks the files and the key password before it starts, and logs a warning 30 days before the certificate ends.
+  - `scripts/network.ps1 allow` (administrator) opens the port in Windows Firewall for **private** networks only.
+- **Rejected:**
+  - A self-signed certificate without a CA: every browser warns, and staff learn to click through warnings.
+  - A reverse proxy (Caddy, nginx): another program to download, start and keep alive, for the same result on a small network.
+  - A public certificate (Let's Encrypt): needs a public domain and DNS, which the school does not have for this computer.
+  - HSTS: if HTTPS were turned off later, browsers would refuse the plain address for a long time.
+- **Guide:** `docs/setup/network.md` (each staff computer installs `reel-ca.crt` once, after checking its thumbprint).
 

@@ -1,4 +1,5 @@
-"""``reel serve`` (the staff dashboard) and ``reel user`` (staff accounts) (T-802)."""
+"""``reel serve`` (the staff dashboard), ``reel user`` (staff accounts) (T-802) and
+``reel cert`` (the HTTPS certificate, T-1008)."""
 
 import argparse
 import getpass
@@ -13,6 +14,7 @@ from reel.auth.store import SecretStore, SecretStoreError, make_secret_store
 from reel.config.loader import ConfigError, ConfigProvider, LoadedConfig, find_config_file
 from reel.db import Database, DatabaseError, StaffUser, normalize_username, open_database
 from reel.logging_setup import configure_from_config, register_secret
+from reel.web import tls
 from reel.web.security import MIN_SECRET_LENGTH, PasswordError, hash_password
 
 log = logging.getLogger("reel.web")
@@ -66,6 +68,23 @@ def register(commands: argparse._SubParsersAction) -> None:
         action.set_defaults(handler=run_user_active, active=active)
     listing = actions.add_parser("list", help="list staff accounts")
     listing.set_defaults(handler=run_user_list)
+
+    cert = commands.add_parser(
+        "cert", help="make or renew the dashboard's HTTPS certificate for the local network"
+    )
+    cert.add_argument(
+        "--name", action="append", default=[], help="another name of this computer (repeatable)"
+    )
+    cert.add_argument(
+        "--ip", action="append", default=[], metavar="ADDRESS",
+        help="another private IPv4 address of this computer (repeatable)",
+    )  # fmt: skip
+    cert.add_argument(
+        "--new-ca", action="store_true",
+        help="make a new CA too; every staff computer must trust it again",
+    )  # fmt: skip
+    cert.add_argument("--show", action="store_true", help="only show the current certificate")
+    cert.set_defaults(handler=run_cert)
 
 
 def _open(args: argparse.Namespace) -> tuple[LoadedConfig, Database]:
@@ -162,6 +181,40 @@ def run_user_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_cert(args: argparse.Namespace) -> int:
+    try:
+        cfg = ConfigProvider(find_config_file(args.config)).get()
+        folder = tls.tls_folder(cfg)
+        if args.show:
+            info = tls.read(folder)
+            if info is None:
+                print(f"No certificate in {folder}. Make one with: reel cert")
+                return 1
+        else:
+            names, addresses = tls.local_names(args.name), tls.local_addresses(args.ip)
+            password = tls.key_password(make_secret_store(cfg), create=True)
+            info = tls.create(folder, password, names, addresses, new_ca=args.new_ca)
+    except (ConfigError, SecretStoreError, tls.TlsError, OSError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    web = cfg.settings.web
+    print(f"Certificate: {folder / tls.SERVER_CERT} (valid until {info.expires:%Y-%m-%d})")
+    print(f"Names:       {', '.join(info.names)}")
+    print(f"Addresses:   {', '.join(info.addresses)}")
+    state = "NEW: install it on every staff computer" if info.new_ca else "unchanged"
+    print(f"CA:          {folder / tls.CA_CERT} ({state}; valid until {info.ca_expires:%Y-%m-%d})")
+    print(f"CA thumbprint (SHA-1, as Windows shows it): {info.ca_thumbprint}")
+    print(f"CA SHA-256: {info.ca_sha256}")
+    if not web.tls:
+        print()
+        print("To use it, set in config/reel.toml under [web]:")
+        print('  host = "0.0.0.0"')
+        print("  tls = true")
+        print(f'  base_url = "https://{info.names[0]}:{web.port}"')
+        print("then restart Reel (see docs/setup/network.md).")
+    return 0
+
+
 def _loopback(host: str) -> bool:
     if host == "localhost":
         return True
@@ -194,6 +247,7 @@ def run_serve(args: argparse.Namespace) -> int:
     try:
         db = open_database(cfg.paths.database_file)
         secret = session_secret(cfg) if parts.web else None
+        options = tls.uvicorn_options(cfg) if parts.web and web.tls else {}
     except (ConfigError, DatabaseError, SecretStoreError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -210,12 +264,15 @@ def run_serve(args: argparse.Namespace) -> int:
                     "the dashboard listens on %s without HTTPS: put it behind an HTTPS proxy "
                     "and set web.base_url to its https:// address", host,
                 )  # fmt: skip
-        runtime = Runtime(db, provider.get, parts=parts, host=host, port=port, secret=secret)
+        runtime = Runtime(
+            db, provider.get, parts=parts, host=host, port=port, secret=secret, tls=options
+        )
         stop = runtime.stopping
         with stop_on_signals(stop.set):
             runtime.start()
             if parts.web:
-                log.info("dashboard on http://%s:%d", host, port)
+                scheme = "https" if options else "http"
+                log.info("dashboard on %s://%s:%d; staff open %s", scheme, host, port, web.base_url)
             while not stop.is_set() and runtime.alive():
                 time.sleep(0.25)  # short waits keep Ctrl+C responsive
             if not stop.is_set():

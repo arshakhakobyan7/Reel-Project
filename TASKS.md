@@ -30,7 +30,7 @@ The PRD lists `Cleaned` before `Transcribed`. Here the transcript is made first,
 | 7 | Publishing: YouTube, Slack, Classroom, Academy Library | T-701 … T-706 |
 | 8 | Operations: notifications, dashboard, metrics, integration API | T-801 … T-806 |
 | 9 | Runtime, recovery, retention, packaging | T-901 … T-903 |
-| 10 | End-to-end verification and documentation | T-1001 … T-1007 |
+| 10 | End-to-end verification and documentation | T-1001 … T-1008 |
 
 ## Task summary
 
@@ -87,6 +87,7 @@ The PRD lists `Cleaned` before `Transcribed`. Here the transcript is made first,
 | T-1005 | Final verification | Must | all | DONE (to be refreshed after T-1002 and T-1003) |
 | T-1006 | Board framing (user request) | Must | T-403, T-405 | DONE (the user reviews it on a real lesson) |
 | T-1007 | Dashboard design: dark brand colour system (user request) | Should | T-802 … T-807 | DONE (GPT, reviewed; the user checks it in the browser) |
+| T-1008 | The dashboard on the local network over HTTPS (user request, D-060) | Should | T-802, T-901 | DONE (the user opens the firewall and installs the CA on staff computers) |
 
 ---
 
