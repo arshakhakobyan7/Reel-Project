@@ -208,6 +208,21 @@ ruff clean) and what was run on this PC.
 
 ## Log (newest first)
 
+### 2026-11-20 20:30 — YouTube publishing turned on (the user: "Այո, միացրու YouTube-ը")
+- `config/reel.toml`: `[youtube] mode = "live"`. Slack, Classroom and staff notifications stay in dry-run. Privacy stays unlisted (D-017).
+- **Checked before:**
+  - `reel auth status --check`: both YouTube permissions are granted, and the access token was refreshed.
+  - `reel config check`: OK. A group without a playlist is now a warning, not an error, because the video is still uploaded (flag `youtube_no_playlist`) and typed groups start with empty IDs (D-061). Test: `test_config_cli.py`.
+- **What happens to job #2 when Reel starts:**
+  - Chapters runs.
+  - Consent holds the job for a staff release, because there is no `config/consent.json`.
+  - After **Թողարկել** in the dashboard, Upload sends the video to YouTube as unlisted, without a playlist.
+- **Known limits** (docs/setup/google.md):
+  - An unaudited API project may get its videos locked to private (flag `youtube_not_unlisted`; Google's free audit form fixes it).
+  - An *External* app in *Testing* status loses access after 7 days; *Publish app* avoids it.
+  - Uploads use most of the free daily quota.
+- Committed with the check change.
+
 ### 2026-11-20 20:25 — T-1009 Why the video did not reach YouTube; typed groups added; transcript off the page (D-061) — DONE
 - **The user's question:** why does the processed video not go to YouTube?
 - **Found** (real database, `reel status 2`, `reel auth status`):

@@ -109,18 +109,23 @@ def run_checks(
     )
     add("info", f"Academy Library: {library}")
 
+    # A video without a playlist is still uploaded (flag youtube_no_playlist), and groups
+    # typed in the dashboard start with empty IDs (D-061): a warning. Slack and Classroom
+    # cannot post without their channel or course: an error.
     group_ids = (
         (
             "youtube_playlist_id",
             s.youtube.mode == "live" and not s.youtube.create_missing_playlists,
+            "warn",
+            ": their videos are uploaded without a playlist",
         ),
-        ("slack_channel", s.slack.mode == "live"),
-        ("classroom_course_id", s.classroom.mode == "live"),
+        ("slack_channel", s.slack.mode == "live", "error", ""),
+        ("classroom_course_id", s.classroom.mode == "live", "error", ""),
     )
-    for attribute, needed in group_ids:
+    for attribute, needed, level, result in group_ids:
         missing_groups = [n for n, g in cfg.groups.groups.items() if not getattr(g, attribute)]
         if needed and missing_groups:
-            add("error", f"{attribute} is empty for group(s): {', '.join(missing_groups)}")
+            add(level, f"{attribute} is empty for group(s): {', '.join(missing_groups)}{result}")
 
     needed_secrets = required_secrets(s)
     for name, reason in needed_secrets.items():

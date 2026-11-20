@@ -78,6 +78,17 @@ def test_checks_report_environment_problems(project, write_config):
     assert any("slack_channel is empty for group(s): Python 12" in e for e in errors)
 
 
+def test_a_live_youtube_group_without_a_playlist_is_a_warning(project, write_config):
+    write_config('[youtube]\nmode = "live"\n')
+    items = run_checks(load_config(project / "config" / "reel.toml", environ={}), ffmpeg_ok)
+    playlist = [item for item in items if "youtube_playlist_id" in item.message]
+    assert [(item.level, item.message) for item in playlist] == [(
+        "warn",
+        "youtube_playlist_id is empty for group(s): Python 12: "
+        "their videos are uploaded without a playlist",
+    )]  # fmt: skip
+
+
 def test_checks_report_missing_ffmpeg(project):
     items = run_checks(load_config(project / "config" / "reel.toml", environ={}), ffmpeg_missing)
     assert any(i.level == "error" and "FFmpeg" in i.message for i in items)
