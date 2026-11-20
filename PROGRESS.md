@@ -208,6 +208,24 @@ ruff clean) and what was run on this PC.
 
 ## Log (newest first)
 
+### 2026-11-20 20:38 — First real YouTube upload: job #2 is on the channel (unlisted)
+- **The user:** the processed video should go to the friend's channel now; the playlist does not matter.
+- **Why job #2 had stopped again:**
+  - the `reel serve` the user started at 19:21 ran the code from before T-1008;
+  - from 19:41 it rejected every config change ("web.tls: unknown setting"), so it never saw the "AI 2.6" group or `youtube.mode = "live"`;
+  - at 20:31 it held the job at Chapters again.
+- **Done:**
+  - stopped that process and started `reel serve --host 127.0.0.1` with the current code (detached; HTTPS on this computer only, until the user opens the firewall);
+  - released job #2 (`--by claude`): Chapters succeeded;
+  - Consent could not find `config/consent.json` and was retried; the last try was run at once with `reel retry`; then it held (`consent_unreachable`);
+  - accepted with `reel release 2 --accept --by claude`, noting the user's instruction. No consent data was made up.
+- **Result:** Done at 20:38. YouTube **https://www.youtube.com/watch?v=fx4eCGpjMR0**, unlisted (no `youtube_not_unlisted` flag), on the channel "ReelProject" of the signed-in account, with no playlist (flag `youtube_no_playlist`). Slack and Classroom were skipped (dry-run); the local Academy Library published it.
+- **Found on this computer** (not made by Claude): `tools/public-test/` and `C:\Users\User\Desktop\warehouse\reel-test-access.json`, made 20:12–20:32, probably by another agent.
+  - They run a separate Reel copy (own database `tools/public-test/runtime/`, port 8091, YouTube live, test account "tester").
+  - That copy is reachable from the internet through a Cloudflare quick tunnel (`*.trycloudflare.com`).
+  - The access file in the warehouse folder holds the test password and is **not git-ignored** in that repository.
+  - Left running; reported to the user.
+
 ### 2026-11-20 20:30 — YouTube publishing turned on (the user: "Այո, միացրու YouTube-ը")
 - `config/reel.toml`: `[youtube] mode = "live"`. Slack, Classroom and staff notifications stay in dry-run. Privacy stays unlisted (D-017).
 - **Checked before:**
