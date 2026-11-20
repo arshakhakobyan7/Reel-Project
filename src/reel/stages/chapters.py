@@ -18,6 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from reel.config.groups import missing_group_message
 from reel.config.loader import LoadedConfig
 from reel.db import Job, Stage, TranscriptKind, VideoMetadata
 from reel.llm import LLMClient, LLMError, MeteredLLM, OnDemandLLM
@@ -63,15 +64,11 @@ class ChaptersStage(StageHandler):
             recording_date = recording.recording_date
             transcript = load_transcript(session, ctx.job_id, TranscriptKind.CLEAN)
         group = cfg.groups.groups.get(group_name) if group_name else None
-        missing = [
-            name
-            for name, ok in (("group", group is not None), ("lesson number", lesson is not None))
-            if not ok
-        ]
-        if missing:
+        if group is None:
+            raise Hold(IDENTIFICATION, missing_group_message(group_name, lesson is None))
+        if lesson is None:
             raise Hold(
-                IDENTIFICATION,
-                f"Set the {' and '.join(missing)} of this recording, then release the job.",
+                IDENTIFICATION, "Set the lesson number of this recording, then release the job."
             )
         video = ctx.job_dir / CLEANED_FILE
         if transcript is None or not video.is_file():

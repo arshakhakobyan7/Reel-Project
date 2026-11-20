@@ -30,7 +30,7 @@ The PRD lists `Cleaned` before `Transcribed`. Here the transcript is made first,
 | 7 | Publishing: YouTube, Slack, Classroom, Academy Library | T-701 … T-706 |
 | 8 | Operations: notifications, dashboard, metrics, integration API | T-801 … T-806 |
 | 9 | Runtime, recovery, retention, packaging | T-901 … T-903 |
-| 10 | End-to-end verification and documentation | T-1001 … T-1008 |
+| 10 | End-to-end verification and documentation | T-1001 … T-1009 |
 
 ## Task summary
 
@@ -88,6 +88,7 @@ The PRD lists `Cleaned` before `Transcribed`. Here the transcript is made first,
 | T-1006 | Board framing (user request) | Must | T-403, T-405 | DONE (the user reviews it on a real lesson) |
 | T-1007 | Dashboard design: dark brand colour system (user request) | Should | T-802 … T-807 | DONE (GPT, reviewed; the user checks it in the browser) |
 | T-1008 | The dashboard on the local network over HTTPS (user request, D-060) | Should | T-802, T-901 | DONE (the user opens the firewall and installs the CA on staff computers) |
+| T-1009 | Why the video did not reach YouTube: typed groups added to groups.toml, clear hold message, permission check; transcript removed from the page (user request, D-061) | Must | T-807, T-504 | DONE |
 
 ---
 

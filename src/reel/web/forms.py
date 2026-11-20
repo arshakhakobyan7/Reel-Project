@@ -5,10 +5,15 @@ character from the Armenian keyboard layout, whose number row types letters, so 
 looked broken; plain text shows what was typed and the server explains what is wrong.
 """
 
+import logging
 import re
 import unicodedata
+from datetime import date
 
-from reel.config.groups import GroupsFile
+from reel.config.groups import GroupsFile, add_group
+from reel.config.loader import LoadedConfig
+
+log = logging.getLogger("reel.web")
 
 MAX_GROUP_LENGTH = 100
 _SPACES = re.compile(r"\s+")
@@ -25,6 +30,24 @@ def parse_group(text: str, groups: GroupsFile) -> str:
         raise ValueError(f"Խմբի անունը շատ երկար է (առավելագույնը {MAX_GROUP_LENGTH} նիշ)։")
     found = groups.find(name)
     return found[0] if found else name
+
+
+def ensure_group(text: str, cfg: LoadedConfig, by: str) -> str:
+    """``parse_group``; a typed group that groups.toml does not have yet is added to it at
+    once, with empty IDs (D-061), so the recording does not stop for lack of a group.
+
+    If the file cannot be changed, the typed name is still used: the job then waits at
+    Chapters with a message that names the group (``missing_group_message``)."""
+    name = parse_group(text, cfg.groups)
+    if cfg.groups.find(name) is None:
+        note = f"added in the dashboard by {by} on {date.today().isoformat()}"
+        try:
+            name, added = add_group(cfg.paths.groups_file, name, note=note)
+            if added:
+                log.info("group %r added to %s by %s", name, cfg.paths.groups_file, by)
+        except OSError, ValueError:
+            log.exception("group %r could not be added to %s", name, cfg.paths.groups_file)
+    return name
 
 
 def parse_lesson(text: str | int | None) -> int | None:

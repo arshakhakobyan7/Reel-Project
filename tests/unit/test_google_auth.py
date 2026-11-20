@@ -267,6 +267,16 @@ def test_reel_auth_status_without_and_with_a_connection(project, write_config, c
     assert main(["--config", config, "auth", "status"]) == 0
     out = capsys.readouterr().out
     assert "Connected since 2026-11-20" in out and "4 scopes" in out and REFRESH not in out
+    assert "youtube: all 2 permissions granted" in out and "classroom: all 2" in out
+    FileSecretStore(project / "data" / "secrets.dev.json").set(
+        STORE_KEY,
+        json.dumps({"refresh_token": REFRESH, "client_id": "x", "scopes": [SCOPES[0]],
+                    "connected_at": "2026-11-20T00:00:00+00:00"}),
+    )  # fmt: skip
+    assert main(["--config", config, "auth", "status"]) == 0
+    seen = capsys.readouterr()
+    assert f"youtube: MISSING {SCOPES[1]}" in seen.out and "classroom: not connected" in seen.out
+    assert "youtube lacks a permission" in seen.err
     assert main(["--config", config, "auth", "google"]) == 1  # no client file configured
     assert "GOOGLE_CLIENT_SECRETS_FILE is not set" in capsys.readouterr().err
 

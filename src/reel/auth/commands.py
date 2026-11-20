@@ -72,6 +72,21 @@ def run_google(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_services(granted: set[str]) -> None:
+    """Which service has all its permissions; a missing one is a warning (a Google consent
+    screen lets the user untick a permission, and then that part fails later)."""
+    for service, wanted in SERVICE_SCOPES.items():
+        missing = [scope for scope in wanted if scope not in granted]
+        if not missing:
+            print(f"  {service}: all {len(wanted)} permissions granted")
+        elif len(missing) == len(wanted):
+            print(f"  {service}: not connected (reel auth google --only {service})")
+        else:
+            print(f"  {service}: MISSING {', '.join(missing)}")
+            print(f"WARNING: {service} lacks a permission. Run 'reel auth google --only "
+                  f"{service}' again and tick every box.", file=sys.stderr)  # fmt: skip
+
+
 def run_status(args: argparse.Namespace) -> int:
     try:
         cfg = _config(args)
@@ -82,6 +97,7 @@ def run_status(args: argparse.Namespace) -> int:
             return 1
         print(f"Connected since {info.get('connected_at')} ({store.name} store), "
               f"{len(info.get('scopes', []))} scopes.")  # fmt: skip
+        _print_services(set(info.get("scopes", [])))
         if args.check:
             _tokens(cfg, store).token()
             print("Access token: OK (refreshed just now).")

@@ -354,8 +354,8 @@ tbody tr:hover { background: var(--surface-elevated); }
 .cutbar .removed { fill: var(--cut-removed); }
 .reasons { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 0; color: var(--text-secondary); font-size: 13px; list-style: none; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; }
-.chapters, .transcript { padding-left: 0; margin: 0; list-style: none; }
-.chapters li, .transcript li { padding: 5px 0; overflow-wrap: anywhere; }
+.chapters { padding-left: 0; margin: 0; list-style: none; }
+.chapters li { padding: 5px 0; overflow-wrap: anywhere; }
 .at { margin-right: 8px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .player { display: block; width: 100%; max-width: 960px; background: var(--background); border: 1px solid var(--control-border); border-radius: 8px; }
 .thumb { width: 100%; max-width: 480px; border: 1px solid var(--border-strong); border-radius: 8px; }

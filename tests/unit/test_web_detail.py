@@ -10,6 +10,7 @@ from sqlalchemy import select
 from test_web_dashboard import add_job
 
 from reel.config import load_config
+from reel.config.loader import load_groups
 from reel.db import (
     ConsentCheck,
     Job,
@@ -156,7 +157,9 @@ def test_the_detail_page_shows_the_whole_story(site):
     assert "Գրատախտակի մոտ ոչ ոք չկա՝ 32:29" in html
     assert "18:40</span> Բառարաններ" in html and "Python 12 · Դաս 14 · Բառարաններ" in html
     assert f'src="/recordings/{job_id}/thumbnail"' in html
-    assert "Բարև ձեզ" in html and "&lt;i&gt;ցուցակներ&lt;/i&gt;" in html
+    # the transcript is not shown any more (the user, 2026-11-20, D-061)
+    assert "Բարև ձեզ" not in html and "ցուցակներ" not in html
+    assert 'class="transcript"' not in html and "մաքրված տեսանյութի ժամանակներով" not in html
     assert 'href="https://www.youtube.com/watch?v=abc"' in html
     assert "javascript:" not in html  # an unsafe link is not shown as a link
     assert "Slack request failed: ratelimited." in html and "Բաց թողնված" in html
@@ -252,6 +255,9 @@ def test_the_group_is_typed_and_matched_to_groups_toml(site, typed, saved):
     assert post(site, job_id, "identify", group=typed, lesson="12").status_code == 303
     state = job(site.db, job_id)
     assert (state.group, state.lesson, state.status) == (saved, 12, JobStatus.QUEUED)
+    assert list(load_groups(site.cfg.paths.groups_file).groups) == [
+        "Python 12", "Java 3", *(["Go 1"] if saved == "Go 1" else []),
+    ]  # fmt: skip
 
 
 @pytest.mark.parametrize(

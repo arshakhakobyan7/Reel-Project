@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from reel.config import load_config
+from reel.config.loader import load_groups
 from reel.db import Job, JobStatus, Recording, StaffUser, Stage, init_database, open_database
 from reel.ingest import upload as upload_module
 from reel.ingest.upload import Lesson, UploadError, UploadStore, safe_name
@@ -176,9 +177,17 @@ def test_the_group_is_typed_and_matched_to_groups_toml(site):
     known = start(site, [10], group="  python   12 ", lesson=" 14 ")
     assert known.status_code == 201
     assert site.client.get(f"/uploads/{known.json()['id']}").json()["group"] == "Python 12"
-    new = start(site, [11], group="Go  1")  # not in groups.toml: kept as typed
+    wrong = start(site, [11], group="Rust 1", lesson="x")  # a wrong form adds no group
+    assert wrong.status_code == 400
+    new = start(site, [11], group="Go  1")  # not in groups.toml: added to it (D-061)
     assert new.status_code == 201
     assert site.client.get(f"/uploads/{new.json()['id']}").json()["group"] == "Go 1"
+    groups_file = site.cfg.paths.groups_file
+    assert list(load_groups(groups_file).groups) == ["Python 12", "Go 1"]
+    assert "added in the dashboard by anna on " in groups_file.read_text(encoding="utf-8")
+    again = start(site, [12], group="go-1")  # the file has it now, under its first name
+    assert site.client.get(f"/uploads/{again.json()['id']}").json()["group"] == "Go 1"
+    assert list(load_groups(groups_file).groups) == ["Python 12", "Go 1"]
 
 
 def test_a_two_part_lesson_is_uploaded_resumed_and_queued(site):

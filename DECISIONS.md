@@ -65,6 +65,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-058 | Board framing: the whole board and all the work stay in the picture, with a small margin; one crop per camera; applied in the render | user + agent | Accepted |
 | D-059 | The LLM never cuts the lesson's start or end alone: the line it names must hold a configured phrase | user | Accepted |
 | D-060 | The dashboard on the local network: HTTPS from Reel itself, with its own name-constrained CA | user + agent | Accepted |
+| D-061 | A group typed in the dashboard is added to groups.toml at once; the transcript is not shown on the recording page | user | Accepted |
 
 ---
 
@@ -438,7 +439,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 - **Recording detail (T-804):** `/recordings/<id>` shows the stage pills, the hold or error, the facts, the actions, and:
   - the cut-list bar as an SVG (blue kept, grey removed), drawn with SVG attributes because the CSP allows no inline styles, with the removed time per reason in Armenian;
   - chapters, title, summary, description and the thumbnail (served only from inside the data folder);
-  - publications (only `http(s)` links are shown as links), consent checks with the staff decision, stage runs, the first 60 transcript lines, and the event history.
+  - publications (only `http(s)` links are shown as links), consent checks with the staff decision, stage runs, and the event history. (The first 60 transcript lines were shown here too, until the user asked to remove them on 2026-11-20, D-061.)
 - **Actions** are POST forms with the CSRF token. They call the queue, which writes an event with the staff name and note, then go back to the page with an Armenian message (an invalid one → 409):
   - release a hold: "accept and continue" or "check again";
   - cancel;
@@ -605,4 +606,17 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
   - A public certificate (Let's Encrypt): needs a public domain and DNS, which the school does not have for this computer.
   - HSTS: if HTTPS were turned off later, browsers would refuse the plain address for a long time.
 - **Guide:** `docs/setup/network.md` (each staff computer installs `reel-ca.crt` once, after checking its thumbprint).
+
+### D-061 — Typed groups are added to groups.toml; no transcript on the recording page
+- **Date:** 2026-11-20 · **Source:** the user, after asking why an uploaded lesson did not reach YouTube · **Status:** Accepted
+- **What happened:** a lesson was uploaded for the group "AI 2.6". The upload page accepts any typed name (the form fix of the same day), but `groups.toml` had only "Python 12". So the job stopped at Chapters with "Set the group of this recording", although a group was set.
+- **The user's rule:** "add any group as soon as I type it".
+- **Decision:**
+  - When staff type a group in the upload form or in "set the group" on a recording, and neither a name nor an alias in `config/groups.toml` matches it, Reel appends `[groups."<name>"]` with empty IDs and a comment naming who added it and when (`add_group`). This happens only after the rest of the form is valid.
+  - The file's text is kept as it is (comments, order). The new text is checked with the same validation before it is written, and the file is replaced in one step. A lock makes two uploads with one new group add it once. If the file cannot be changed, the typed name is still used and the error is logged.
+  - The empty IDs work while the integrations run in dry-run. Before they go live, the group's YouTube playlist, Slack channel and Classroom course are filled in `groups.toml`.
+  - A job whose group is set but not configured (for example, from an older upload) now says so: `The group "<name>" is not in config/groups.toml: …` (`missing_group_message`, in Chapters, Consent and Upload).
+- **Also:**
+  - `reel auth status` lists each Google service's permissions. A permission unticked on Google's consent screen is shown as MISSING, with a warning. That day, only `youtube.upload` had been granted: playlists would have failed.
+  - The user asked to remove the "Տառադարձում (մաքրված տեսանյութի ժամանակներով)" section from the recording page. The transcript itself stays in the database and the job folder, because chapters, the title and the description are made from it.
 

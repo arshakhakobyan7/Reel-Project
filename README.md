@@ -118,7 +118,10 @@ powershell -ExecutionPolicy Bypass -File scripts\autostart.ps1 install
 
 - Copy the file into the group's folder under a watched folder, for example
   `inbox\Python 12\Lecture 14 2026-11-19.mp4`. Reel waits until the copy is complete.
-- In the dashboard, open **Վերբեռնել** (upload), choose the group and the files, and upload.
+- In the dashboard, open **Վերբեռնել** (upload), type the group, choose the files, and upload.
+  - A group that `config\groups.toml` does not have yet is added to it at once, with empty
+    IDs. Fill in its YouTube playlist, Slack channel and Classroom course there before those
+    integrations go live.
   - Several files chosen together are the parts of one lesson; their order can be changed.
   - Large files go in pieces and continue after a dropped connection.
 

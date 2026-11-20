@@ -204,14 +204,6 @@
   {% else %}<p class="muted">Դեռ ոչ մի փուլ չի աշխատել։</p>{% endif %}
 </section>
 
-{% if d.transcript %}
-<section class="card">
-  <h2>Տառադարձում {% if d.transcript_kind == "clean" %}(մաքրված տեսանյութի ժամանակներով){% endif %}</h2>
-  <ol class="transcript">{% for at, text in d.transcript %}<li><span class="at">{{ at }}</span> {{ text }}</li>{% endfor %}</ol>
-  {% if d.transcript_total > d.transcript|length %}<p class="muted small">Ցույց է տրված {{ d.transcript|length }}-ը {{ d.transcript_total }} հատվածից։</p>{% endif %}
-</section>
-{% endif %}
-
 <section class="card table table-panel">
   <h2>Իրադարձություններ</h2>
   <table>

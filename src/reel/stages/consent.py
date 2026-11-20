@@ -15,6 +15,7 @@ for a lesson unless every student of the group consented.
 
 from collections.abc import Callable
 
+from reel.config.groups import missing_group_message
 from reel.config.loader import LoadedConfig
 from reel.consent import ConsentProvider, make_consent_provider
 from reel.db import ConsentCheck, Job, Stage
@@ -52,7 +53,7 @@ class ConsentStage(StageHandler):
             group_name, lesson_date = recording.group_name, recording.recording_date
         group = cfg.groups.groups.get(group_name) if group_name else None
         if group is None:  # the chapters stage holds such jobs; this is a safety net
-            raise Hold("identification", "Set the group of this recording, then release the job.")
+            raise Hold("identification", missing_group_message(group_name))
         provider = self.provider_factory(cfg)
         reference = group.core_engine_group_id or group_name
         decision = provider.check(reference, lesson_date)

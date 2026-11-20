@@ -20,9 +20,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
-from reel.config.groups import GroupsFile
+from reel.config.loader import LoadedConfig
 from reel.ingest.upload import Lesson, UploadError, UploadStore
-from reel.web.forms import parse_group, parse_lesson
+from reel.web.forms import ensure_group, parse_group, parse_lesson
 
 CHUNK_BYTES = 8 * 1024 * 1024  # what the browser sends per request
 
@@ -31,10 +31,10 @@ def _error(exc: UploadError) -> JSONResponse:
     return JSONResponse({"error": str(exc)}, status_code=exc.status)
 
 
-def _lesson(body: dict[str, Any], groups: GroupsFile) -> Lesson:
-    lesson = body.get("lesson")
+def _lesson(body: dict[str, Any], cfg: LoadedConfig, by: str) -> Lesson:
+    lesson, typed = body.get("lesson"), str(body.get("group") or "")
     try:
-        group = parse_group(str(body.get("group") or ""), groups)
+        parse_group(typed, cfg.groups)
         number = parse_lesson(lesson if isinstance(lesson, str | int | None) else str(lesson))
     except ValueError as exc:
         raise UploadError(str(exc)) from None
@@ -44,7 +44,7 @@ def _lesson(body: dict[str, Any], groups: GroupsFile) -> Lesson:
     except TypeError, ValueError:
         raise UploadError("Ամսաթիվը սխալ է։") from None
     note = str(body.get("note") or "")[:1000]
-    return Lesson(group, number, day, note)
+    return Lesson(ensure_group(typed, cfg, by), number, day, note)  # a new group only now
 
 
 def install(app: FastAPI, *, staff: Callable, render: Callable, state: Callable) -> None:
@@ -83,7 +83,7 @@ def install(app: FastAPI, *, staff: Callable, render: Callable, state: Callable)
     async def create(request: Request, user: Annotated[Any, Depends(staff)]) -> Response:
         try:
             body = await json_body(request)
-            lesson = _lesson(body, state(request).config().groups)
+            lesson = _lesson(body, state(request).config(), user.username)
             result = await run_in_threadpool(
                 store(request).create, user.username, lesson, body.get("files")
             )

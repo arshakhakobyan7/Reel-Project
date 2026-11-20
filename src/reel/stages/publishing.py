@@ -42,7 +42,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from reel.auth.google import make_google_tokens
-from reel.config.groups import GroupConfig
+from reel.config.groups import GroupConfig, missing_group_message
 from reel.config.loader import LoadedConfig
 from reel.config.schema import ClassroomSettings, SlackSettings, YoutubeSettings
 from reel.db import AppMeta, Database, Job, PublicationTarget, Stage, StageRun, utcnow
@@ -157,7 +157,7 @@ def load_lesson(ctx: StageContext) -> Lesson:
         raise StageFailed("the database has no instance id; run 'reel db init'", retryable=False)
     group = ctx.config.groups.groups.get(group_name) if group_name else None
     if group is None:  # the chapters stage holds such jobs; this is a safety net
-        raise Hold("identification", "Set the group of this recording, then release the job.")
+        raise Hold("identification", missing_group_message(group_name))
     if metadata is None:
         raise StageFailed(
             "the video has no title and description yet; run Chapters again", retryable=False

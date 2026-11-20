@@ -20,12 +20,11 @@ from reel.db import (
     StageRun,
     utcnow,
 )
-from reel.db.enums import JobStatus, Stage, TranscriptKind
+from reel.db.enums import JobStatus, Stage
 from reel.metrics import JobMetrics, load_job_metrics
 from reel.web import texts
 from reel.web.views import clock_text, local_text, pills, recording_title
 
-TRANSCRIPT_PREVIEW = 60  # segments
 EVENT_LIMIT = 300
 BAR_WIDTH = 1000  # the SVG's own units; it is scaled to the page width
 
@@ -87,9 +86,6 @@ class Detail:
     finished: str
     runs: list[dict[str, Any]] = field(default_factory=list)
     cut: CutView | None = None
-    transcript: list[tuple[str, str]] = field(default_factory=list)
-    transcript_total: int = 0
-    transcript_kind: str = ""
     metadata: dict[str, Any] | None = None
     consent: list[dict[str, Any]] = field(default_factory=list)
     publications: list[dict[str, Any]] = field(default_factory=list)
@@ -231,15 +227,6 @@ def load_detail(
             "error": run.error or "", "worker": run.worker or "",
         })  # fmt: skip
     detail.cut = _cut_view(job)
-    transcript = job.transcript(TranscriptKind.CLEAN) or job.transcript(TranscriptKind.RAW)
-    if transcript is not None:
-        detail.transcript_kind = transcript.kind.value
-        segments = transcript.segments or []
-        detail.transcript_total = len(segments)
-        detail.transcript = [
-            (clock_text(float(s.get("start", 0))), str(s.get("text", "")).strip())
-            for s in segments[:TRANSCRIPT_PREVIEW]
-        ]
     detail.metadata = _metadata(job)
     for check in session.scalars(
         select(ConsentCheck).where(ConsentCheck.job_id == job.id).order_by(ConsentCheck.id.desc())

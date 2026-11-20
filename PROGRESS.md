@@ -6,9 +6,9 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (dry-run; publishing stays local until the user says). 50 of 52 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (dry-run; publishing stays local until the user says). 51 of 53 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1008 — The dashboard on the local network over HTTPS (2026-11-20 19:50) |
+| **Last completed task** | T-1009 — Why the video did not reach YouTube; typed groups added; transcript off the page (2026-11-20 20:25) |
 | **Current task** | — (the user opens the firewall port, starts Reel and checks the design and HTTPS) |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
@@ -207,6 +207,24 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-20 20:25 — T-1009 Why the video did not reach YouTube; typed groups added; transcript off the page (D-061) — DONE
+- **The user's question:** why does the processed video not go to YouTube?
+- **Found** (real database, `reel status 2`, `reel auth status`):
+  1. Job #2 ("AI 2.6 · lesson 15") was on hold at **Chapters**, two stages before YouTube: "Set the group of this recording". The group was set, but `groups.toml` had only "Python 12". The upload form accepts any typed name since the form fix, and nothing added it.
+  2. `[youtube] mode = "dry-run"`: by the user's own rule (local only until they say), nothing is ever sent.
+  3. Google had granted only `youtube.upload`, not `youtube` (playlists). The user signed in again during the work, and now both are granted.
+  4. There is no `config/consent.json`, so every recording waits for a staff release before upload (D-019).
+- **The user's answer:** do it, add any typed group at once, and remove the "Տառադարձում (մաքրված տեսանյութի ժամանակներով)" section from the page.
+- **Done:**
+  - `config/groups.py`: `add_group` and `missing_group_message`. `web/forms.py`: `ensure_group`, used by the upload form and by "set the group", only after the rest of the form is valid.
+  - Chapters, Consent and Upload name a group that is not configured.
+  - `reel auth status` lists each service's permissions and warns about a missing one.
+  - The transcript section was removed from `recording.html` and `detail.py`, with its CSS.
+  - "AI 2.6" was added to the real `config/groups.toml`, with empty IDs. Job #2 was released with `--by claude` and is **queued at Chapters**: it goes on when Reel starts.
+- **Not done:** YouTube stays in dry-run. Going live publishes for real; it waits for the user's explicit say, the playlist ID and the consent registry.
+- **Tests:** `test_groups_add.py` (10: kept text, existing name or alias, Armenian and quotes, no file, no final line break, broken file and bad name change nothing, parallel adds write once, messages). Updated: `test_upload.py` (a wrong form adds nothing; added once; found by another spelling), `test_web_detail.py` (added on "set the group"; no transcript on the page), `test_chapters_stage.py` (the message names the group), `test_google_auth.py` (a missing permission).
+- **Checks:** full suite 1264 passed with `-W error`; ruff check and format are clean (184 files).
 
 ### 2026-11-20 19:50 — T-1008 The dashboard on the local network over HTTPS (user request, D-060) — DONE
 - **Request:** "make the HTTPS setup so staff can sign in from the network".

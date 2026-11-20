@@ -172,4 +172,4 @@ def test_an_unknown_group_is_held_too(setup):
     work(cfg, db)
     job, _ = load(db, job_id)
     assert (job.status, job.hold_reason) == (JobStatus.ON_HOLD, "identification")
-    assert "Set the group of this recording" in job.hold_message
+    assert 'The group "Nobody 99" is not in config/groups.toml' in job.hold_message

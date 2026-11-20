@@ -37,7 +37,7 @@ from reel.db.enums import JobStatus, Stage
 from reel.queue.jobs import InvalidTransition, JobNotFound, JobQueue
 from reel.retention import on_youtube
 from reel.web import api, detail, texts, uploads, views
-from reel.web.forms import parse_group, parse_lesson
+from reel.web.forms import ensure_group, parse_lesson
 from reel.web.security import (
     LoginThrottle,
     Session,
@@ -430,9 +430,9 @@ def create_app(
         recorded: Annotated[str, Form()] = "", note: Note = "",
     ) -> Response:  # fmt: skip
         def operation(queue: JobQueue, by: str) -> None:
-            name = parse_group(group, _state(request).config().groups)
             number = parse_lesson(lesson)
             day = date.fromisoformat(recorded) if recorded.strip() else None
+            name = ensure_group(group, _state(request).config(), by)  # a new group only now
             queue.identify(job_id, by, group=name, lesson=number, recording_date=day,
                            note=note.strip())  # fmt: skip
 
