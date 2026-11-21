@@ -72,6 +72,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-065 | Accounts: open registration; users see their own uploads, which are only processed unless the admin allows publishing; the admin manages accounts | user | Accepted |
 | D-066 | A user's processed video and uploaded files are deleted 30 days after the job ended; the page tells the date | user | Accepted |
 | D-067 | Duplicates per account: a video only processed is compared only with the same account's videos in progress or ready | user | Accepted |
+| D-068 | "My page": every account updates its own details and password; the username never changes; sign-in by username or email; users see no cost panel | user + agent | Accepted |
 
 ---
 
@@ -751,3 +752,21 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
     - The recording's page explains in Armenian. The link to the original appears only for the uploader's own recording, or for an admin.
   - The upgrade to version 3 moves the hash of any recording only processed to `processed_hash`.
 - **Not done (the user's call):** jobs #4–#6, cancelled as duplicates, are not run again. The user uploads the videos again to test.
+
+### D-068 — "My page" for every account (T-1016)
+- **Date:** 2026-11-21 · **Source:** the user (the request); the details by the agent · **Status:** Accepted
+- **The user's request:** accounts, the admin's too, have no page to check and update their own details, for example to change the password. Also, the cost and time panel must go from the user's recording page.
+- **Decision:**
+  - **The page.** `/profile` («Իմ էջը») for every signed-in account, about the signed-in account only, with no account id in the URL. It has two forms:
+    - **details:** first and last name, email, phone. The rules are those of registration.
+      - The email is required for an account that signs in with it (`@` in the username), and optional for `reel user add` accounts.
+      - An email of another account (its email or its username) is refused.
+    - **password:** the current password, then the new one twice.
+      - A wrong current password counts as a failed login (same throttle).
+      - The new password must differ from the current one.
+      - The browser gets a new session, and the account's other sessions end.
+  - **The username never changes.** Job events, uploads and the admin's account page refer to it.
+  - **Sign-in.** The login accepts the username or the current email. If one account has the value as its username and another as its email, the username wins. So after an email change, the new email signs in.
+  - **The cost panel.** «Ծախս և ժամանակ» on the recording page is shown only to the admin. `/metrics` is already admin-only.
+  - The work is given to GPT (`handoff/T-1016.md`, D-031). Claude reviews it and runs the full suite before it counts as done.
+- **Not in this task:** the admin setting another account's password on the web (`reel user password` does it); an email check (D-065).

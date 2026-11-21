@@ -9,7 +9,7 @@
 | **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 57 of 59 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
 | **Last completed task** | T-1015 — Duplicates per account (D-067, 2026-11-21 17:52) |
-| **Current task** | — (the user brings a new lesson video to check the terms) |
+| **Current task** | T-1016 — "My page" (/profile), given to GPT (handoff/T-1016.md); Claude reviews it when the report comes |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
 | **Waiting for approval** | Since 2026-11-20 14:10: report after each task and wait for the user's OK before the next. |
@@ -207,6 +207,26 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 18:12 — T-1016 "My page" handed to GPT (user request, D-068)
+
+- **The user:**
+  - Accounts, the admin's too, have no page to check and update their details, for example
+    the password. Write a prompt for GPT; Claude reviews the work afterwards.
+  - Added during the turn: the «Ծախս և ժամանակ» panel must go from the user's recording page.
+  - The user's re-upload of the test video is being processed; they report the result.
+- **`handoff/T-1016.md`** holds the request verbatim and Reel's rules:
+  - `/profile` for the signed-in account only, with two forms (details; password);
+  - registration's validation, reused;
+  - the username never changes, and sign-in by username or email;
+  - a wrong current password is throttled like a login;
+  - a new session for this browser, and the other sessions end;
+  - no personal data or passwords in logs;
+  - the cost panel shown to admins only;
+  - 13 acceptance criteria;
+  - a preview on port 8093 with a throwaway database. The commands were tried, with plain
+    HTTP and YouTube in dry-run, and answered 200; port 8080 was untouched.
+- Claude reviews GPT's report and code and runs the full suite before T-1016 counts as done.
 
 ### 2026-11-21 17:52 — T-1015 Duplicates per account (user report, D-067) — DONE
 
