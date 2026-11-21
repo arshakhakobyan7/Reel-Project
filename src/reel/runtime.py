@@ -52,7 +52,7 @@ def process_alive(pid: int) -> bool:
             kernel.CloseHandle(ctypes.c_void_p(handle))
     try:
         os.kill(pid, 0)  # signal 0 only checks (POSIX)
-    except ProcessLookupError:
+    except (ProcessLookupError, OverflowError):
         return False
     except PermissionError:
         return True

@@ -1,6 +1,6 @@
 """Render the cleaned video from the cut list (T-405; FR-10, FR-11, NFR-4, D-037).
 
-One FFmpeg filter graph, written to a file (``-/filter_complex``) so long cut lists do not hit
+One FFmpeg filter graph, written to a file so long cut lists do not hit
 the Windows command-line limit: every part of the lesson is an input; each kept segment is
 trimmed from its part (``trim``/``atrim``), gets 30 ms audio fades at its edges (no clicks at the
 joins) and all segments are joined with ``concat``. Loudness is normalised in two passes:
@@ -31,6 +31,7 @@ from reel.cleaning.cutlist import CutList
 from reel.cleaning.framing import Crop
 from reel.config.schema import AudioSettings, RenderSettings
 from reel.media.ffmpeg import NO_WINDOW, CancelHook, FfmpegCancelled, FfmpegError, run_ffmpeg
+from reel.media.ffmpeg_check import run_tool
 
 log = logging.getLogger("reel.media")
 
@@ -228,6 +229,9 @@ def render(
             on_progress(done if done is not None else share * total, min(max(share, 0.0), 1.0))
 
     # Pass 1: measure the loudness of the cleaned audio (audio only, fast).
+    version = run_tool(Path(ffmpeg), "-version")
+    major = re.match(r"ffmpeg version (\d+)\.", version)
+    graph_option = "-filter_complex_script" if major and int(major[1]) < 7 else "-/filter_complex"
     measure_graph = work / "render.measure.graph"
     measure_graph.write_text(
         build_graph(
@@ -240,7 +244,7 @@ def render(
     run_ffmpeg(
         ffmpeg,
         ["-v", "info", *(a for v in videos for a in ("-i", str(v.path))),
-         "-/filter_complex", measure_graph, "-map", "[a]", "-f", "null", "-"],
+         graph_option, measure_graph, "-map", "[a]", "-f", "null", "-"],
         duration=total,
         on_progress=lambda done, share: report(0.1 * (share or 0)),
         on_cancel=on_cancel,
@@ -288,7 +292,7 @@ def render(
         try:
             run_ffmpeg(
                 ffmpeg,
-                ["-y", "-v", "info", *_inputs(videos, gpu), "-/filter_complex", graph,
+                ["-y", "-v", "info", *_inputs(videos, gpu), graph_option, graph,
                  "-map", "[v]", "-map", "[a]", *codec,
                  "-c:a", "aac", "-b:a", settings.audio_bitrate, "-ar", str(SAMPLE_RATE),
                  "-movflags", "+faststart", "-f", "mp4", partial],

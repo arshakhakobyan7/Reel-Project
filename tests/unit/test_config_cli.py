@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -53,7 +54,8 @@ def test_check_passes_for_the_example_config(project, monkeypatch, capsys):
     assert "Result: OK - 0 error(s), 2 warning(s)" in out
     assert "[WARN] database" in out and "run `reel db init`" in out
     assert "[WARN] consent registry" in out
-    assert "[ OK ] FFmpeg: ffmpeg version 9.0.1" in out
+    version = subprocess.check_output([FFMPEG_BIN / "ffmpeg.exe", "-version"], text=True)
+    assert f"[ OK ] FFmpeg: {version.splitlines()[0]}" in out
 
 
 def test_check_fails_for_a_broken_config(project, write_config, capsys):
