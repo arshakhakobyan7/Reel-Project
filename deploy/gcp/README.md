@@ -14,6 +14,22 @@ unless the account is upgraded to a paid one. When the review is over, the VM is
 | Settings | `config/reel.toml` copied from the PC. The server's differences are in `.env` (`server.env.template`): Linux paths, no TLS in Reel, `auth.store = "posix"`, CPU instead of the Intel GPU. |
 | Secrets | `.env` (a new session secret, 0600) and `data/secrets/tokens.json` (Google token, 0600) |
 
+## Teacher demo with a fresh database
+
+Copy the repository source to `/opt/reel` and run the setup script in step 5.
+On a fresh VM the script creates the settings from the examples and initializes SQLite.
+Keep publishing in dry-run mode. For this workflow, skip the existing database, Google
+client file and token transfer in steps 4 and 6. Teachers register at `/register` and
+can process, play and download their own recordings.
+
+The default minimum recording length is five minutes. For a short classroom demo set
+`min_duration_minutes = 0.25` under `[ingest]` in `config/reel.toml` to accept
+recordings of at least 15 seconds.
+
+For a two-week review add `--max-run-duration=336h --instance-termination-action=STOP`
+to the VM creation command. The disk remains allocated after an automatic stop.
+Save any results and remove the VM and disk after grading.
+
 ## Steps
 
 1. **The user:**

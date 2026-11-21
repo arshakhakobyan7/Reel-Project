@@ -95,6 +95,14 @@ chmod 600 "$APP/.env"
 [ -f "$APP/config/google-client.json" ] && chown reel:reel "$APP/config/google-client.json" \
     && chmod 600 "$APP/config/google-client.json"
 
+echo "== initial configuration for a clean demo"
+for name in reel groups; do
+    if [ ! -f "$APP/config/$name.toml" ]; then
+        as_reel cp "$APP/config/$name.example.toml" "$APP/config/$name.toml"
+    fi
+done
+as_reel mkdir -p "$APP/inbox"
+
 echo "== checks"
 as_reel "$APP/.venv/bin/reel" db status >/dev/null 2>&1 || as_reel "$APP/.venv/bin/reel" db init
 as_reel "$APP/.venv/bin/reel" config check || true
@@ -105,7 +113,7 @@ sed "s|@HOST@|$HOST|" "$APP/deploy/gcp/Caddyfile.template" > /etc/caddy/Caddyfil
 systemctl daemon-reload
 systemctl enable --now reel
 systemctl reload-or-restart caddy
-sleep 5
-systemctl --no-pager --lines=5 status reel || true
-curl -fsS -o /dev/null -w "local dashboard: %{http_code}\n" http://127.0.0.1:8080/login || true
+systemctl is-active --quiet reel caddy
+curl --retry 12 --retry-delay 2 --retry-connrefused -fsS -o /dev/null \
+    -w "local dashboard: %{http_code}\n" http://127.0.0.1:8080/login
 echo "done: https://$HOST"
