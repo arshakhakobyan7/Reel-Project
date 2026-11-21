@@ -532,6 +532,9 @@ class RetentionSettings(Section):
     transcripts_days: int = Field(default=365, ge=0, le=3650)  # 0 = keep forever
     delete_source_recordings: bool = False  # D-021
     source_recordings_days: int = Field(default=90, ge=7, le=3650)
+    # a user's video that is only processed (T-1014): its processed video and uploaded
+    # files go this many days after the job ended; 0 = keep forever
+    processed_only_days: int = Field(default=30, ge=0, le=3650)
 
 
 class BudgetSettings(Section):

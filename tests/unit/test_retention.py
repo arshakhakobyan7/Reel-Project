@@ -3,6 +3,7 @@
 import json
 import threading
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import func, select
@@ -23,7 +24,8 @@ from reel.db import (
     open_database,
 )
 from reel.db.enums import PublicationStatus, TargetKind, TranscriptKind
-from reel.retention import ONLY_COPY, cleanup, daily
+from reel.retention import ONLY_COPY, cleanup, daily, keep_until
+from reel.web.detail import load_detail
 
 NOW = datetime(2026, 12, 31, 12, 0, tzinfo=UTC)
 
@@ -233,12 +235,91 @@ def test_the_recording_page_survives_a_removed_thumbnail(env):
         meta.thumbnail_path = str(env.cfg.paths.data_dir / "jobs" / str(job_id) / "thumb.jpg")
         assert s.get(Job, job_id).recording is not None
     cleanup(env.db, env.cfg, now=NOW)
-    from zoneinfo import ZoneInfo
-
-    from reel.web.detail import load_detail
-
     with env.db.transaction() as s:
         detail = load_detail(s, job_id, ZoneInfo("Asia/Yerevan"))
     assert detail.metadata["has_thumbnail"] is False
     with env.db.transaction() as s:
         assert s.scalar(select(func.count()).select_from(Recording)) == 1
+
+
+# --- T-1014: a user's video that is only processed goes after 30 days -----------------------
+
+
+def user_job(env, status, days, *, parts=1):
+    """A user's upload that is only processed: its files are in data/recordings/<upload>/."""
+    job_id = env.job(status, days, transcripts=False, youtube=None)
+    folder = env.cfg.paths.data_dir / "recordings" / f"upload{job_id}"
+    folder.mkdir(parents=True)
+    stored = [folder / f"{number:02d}-part.mov" for number in range(1, parts + 1)]
+    for path in stored:
+        path.write_bytes(b"u" * 200)
+    with env.db.transaction() as s:
+        recording = s.get(Job, job_id).recording
+        recording.publish, recording.source_path = False, str(stored[0])
+        if parts > 1:
+            recording.media_info = {"parts": [{"path": str(path)} for path in stored]}
+    return job_id, folder
+
+
+def test_a_users_processed_video_and_uploaded_files_go_after_30_days(env):
+    old, old_upload = user_job(env, JobStatus.DONE, 31, parts=2)
+    fresh, fresh_upload = user_job(env, JobStatus.DONE, 29)
+    failed, failed_upload = user_job(env, JobStatus.FAILED, 40)
+    held, held_upload = user_job(env, JobStatus.ON_HOLD, 400)
+    preview = env.job(JobStatus.DONE, 400, transcripts=False, youtube="dry-run")  # D-057 still
+    report = cleanup(env.db, env.cfg, now=NOW)
+    assert {r.detail for r in report.removals} == {
+        f"job {old} processed video", f"job {old} uploaded files {old_upload.name}",
+        f"job {failed} processed video", f"job {failed} uploaded files {failed_upload.name}",
+    }  # fmt: skip
+    assert report.kept == [f"job {preview} working files: {ONLY_COPY}"]
+    jobs = env.cfg.paths.data_dir / "jobs"
+    for job_id, upload in ((old, old_upload), (failed, failed_upload)):
+        assert not (jobs / str(job_id)).exists() and not upload.exists()
+    for job_id, upload in ((fresh, fresh_upload), (held, held_upload)):
+        assert (jobs / str(job_id) / "cleaned.mp4").is_file() and upload.is_dir()
+    assert (jobs / str(preview) / "cleaned.mp4").is_file()
+    assert env.events(old) == ["retention: removed processed_video, uploaded_files (0 MB)"]
+    with env.db.transaction() as s:
+        assert keep_until(s.get(Job, fresh), 30) == NOW + timedelta(days=1)
+        assert keep_until(s.get(Job, fresh), 0) is None  # 0 = keep
+        assert keep_until(s.get(Job, held), 30) is None  # not ended yet
+        assert keep_until(s.get(Job, preview), 30) is None  # published, not a user's video
+        gone = load_detail(s, old, ZoneInfo("Asia/Yerevan"))
+        assert gone.deleted and not gone.can_rerun  # nothing is left to run again
+        assert gone.metadata["title"] == f"lesson {old}"  # the title and history stay
+        kept = load_detail(s, fresh, ZoneInfo("Asia/Yerevan"))
+        assert kept.deleted == "" and kept.can_rerun
+    assert cleanup(env.db, env.cfg, now=NOW).removals == []
+
+
+def test_only_files_reel_received_are_deleted_with_a_users_video(env):
+    env.configure("[retention]\ndelete_source_recordings = true\n")
+    upload_job, upload = user_job(env, JobStatus.DONE, 100)
+    watched = env.job(JobStatus.DONE, 100, transcripts=False, youtube=None)
+    source = env.cfg.paths.watch_folders[0] / "mine.mp4"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(b"s" * 10)
+    loose = env.cfg.paths.data_dir / "recordings" / "loose.mp4"  # not in an upload's folder
+    loose.write_bytes(b"l")
+    stray = env.job(JobStatus.DONE, 100, transcripts=False, youtube=None)
+    with env.db.transaction() as s:
+        for job_id, path in ((watched, source), (stray, loose)):
+            recording = s.get(Job, job_id).recording
+            recording.publish, recording.source_path = False, str(path)
+    report = cleanup(env.db, env.cfg, now=NOW)
+    assert sorted(r.detail for r in report.removals) == sorted([
+        f"job {upload_job} processed video", f"job {upload_job} uploaded files {upload.name}",
+        f"job {watched} processed video", f"job {stray} processed video",
+    ])  # fmt: skip
+    # no "source" removal on top, and the watched original stays (D-021)
+    assert source.is_file() and loose.is_file() and not upload.exists()
+
+
+def test_zero_days_keeps_a_users_video(project, write_config):
+    env = Env(project, write_config, "[retention]\nprocessed_only_days = 0\n")
+    with env.db:
+        job_id, upload = user_job(env, JobStatus.DONE, 3000)
+        report = cleanup(env.db, env.cfg, now=NOW)
+        assert report.removals == [] and report.kept == [f"job {job_id} working files: {ONLY_COPY}"]
+        assert upload.is_dir()

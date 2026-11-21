@@ -149,6 +149,10 @@ its recent actions, and can:
 - **Թույլ տալ տեղադրել YouTube-ում**: the account's new uploads are published like the admin's;
 - **Փակել հաշիվը**: the account cannot sign in any more; its open sessions end at once.
 
+A user's processed video and uploaded files are deleted 30 days after it is ready
+(`[retention] processed_only_days`, 0 = keep). The recording's page shows the last day
+to download it.
+
 `[web] registration = false` turns registration off.
 
 **When Reel needs staff.** It sends a Slack alert, and the recording shows one of these:

@@ -35,8 +35,14 @@
   <h2>Տեսանյութ</h2>
   <video class="player" controls preload="metadata" src="/recordings/{{ d.job_id }}/video"{% if d.metadata and d.metadata.has_thumbnail %} poster="/recordings/{{ d.job_id }}/thumbnail"{% endif %}></video>
   <p class="small"><a href="/recordings/{{ d.job_id }}/video?download=1" download>Ներբեռնել (MP4)</a>
-    {% if not d.publish %}· <span class="muted">Սա մշակված տեսանյութն է. ներբեռնեք այն։ Այն YouTube-ում չի տեղադրվում։</span>
+    {% if not d.publish and keep_until %}· <span class="muted">Սա մշակված տեսանյութն է. ներբեռնեք այն մինչև <strong>{{ keep_until }}</strong>, դրանից հետո այն ինքնաշխատ կջնջվի։ Այն YouTube-ում չի տեղադրվում։</span>
+    {% elif not d.publish %}· <span class="muted">Սա մշակված տեսանյութն է. ներբեռնեք այն։ Այն YouTube-ում չի տեղադրվում։{% if keep_days %} Մշակումն ավարտվելուց հետո այն կպահվի {{ keep_days }} օր։{% endif %}</span>
     {% elif not on_youtube %}· <span class="muted">Տեսանյութը YouTube-ում չէ. այն միայն այս համակարգչում է և ավտոմատ չի ջնջվի։</span>{% endif %}</p>
+</section>
+{% elif d.deleted %}
+<section class="card">
+  <h2>Տեսանյութ</h2>
+  <p class="muted">Մշակված տեսանյութը և վերբեռնված ֆայլերը ջնջվել են {{ d.deleted }}, քանի որ ներբեռնելու ժամկետն անցել էր։ Անվանումը, բաժիններն ու պատմությունը մնում են։</p>
 </section>
 {% endif %}
 

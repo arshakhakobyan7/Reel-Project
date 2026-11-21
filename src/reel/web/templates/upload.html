@@ -3,7 +3,7 @@
 {% block title %}Վերբեռնել ձայնագրություն{% endblock %}
 {% block content %}
 <h1>Վերբեռնել ձայնագրություն</h1>
-{% if not publishes %}<p class="notice">Ձեր տեսանյութը կմշակվի, բայց չի տեղադրվի YouTube-ում։ Երբ պատրաստ լինի, այն կներբեռնեք ձայնագրության էջից։</p>{% endif %}
+{% if not publishes %}<p class="notice">Ձեր տեսանյութը կմշակվի, բայց չի տեղադրվի YouTube-ում։ Երբ պատրաստ լինի, այն կներբեռնեք ձայնագրության էջից։{% if keep_days %} Մշակված տեսանյութը կպահվի {{ keep_days }} օր, հետո ինքնաշխատ կջնջվի։{% endif %}</p>{% endif %}
 <noscript><p class="error">Վերբեռնման համար browser-ում պետք է միացված լինի JavaScript-ը։</p></noscript>
 
 <form id="upload-form" class="card upload" data-chunk="{{ chunk_bytes }}">

@@ -89,6 +89,7 @@ def install(app: FastAPI, *, staff: Callable, render: Callable, state: Callable)
         context = {
             "groups": sorted(cfg.groups.groups, key=str.casefold) if user.publishes else [],
             "publishes": user.publishes,
+            "keep_days": cfg.settings.retention.processed_only_days,  # T-1014
             "extensions": ",".join(cfg.settings.ingest.extensions),
             "max_gb": cfg.settings.web.upload_max_gb,
             "chunk_bytes": CHUNK_BYTES,

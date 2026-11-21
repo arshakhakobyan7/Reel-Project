@@ -70,6 +70,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-063 | Board framing on a light wall: the board's frame lines; legs under a desk left out | user + agent | Accepted |
 | D-064 | Unclear speech: the job waits; staff publish it as it is, with chapters they set, or cancel it | user | Accepted |
 | D-065 | Accounts: open registration; users see their own uploads, which are only processed unless the admin allows publishing; the admin manages accounts | user | Accepted |
+| D-066 | A user's processed video and uploaded files are deleted 30 days after the job ended; the page tells the date | user | Accepted |
 
 ---
 
@@ -715,4 +716,22 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 - **Rejected:**
   - Approving each new account by hand: the user wants new accounts to work at once. The risk is small, because they cannot publish.
   - Email confirmation and password reset by email: they need a mail service. The admin resets a password with `reel user password`.
-- **Open:** a user's processed videos are kept like every unpublished video (D-057): they are not deleted automatically. A deadline for them would save disk space.
+- **Later:** a user's processed videos are deleted 30 days after they are ready (D-066).
+
+### D-066 — A user's processed video is deleted after 30 days
+- **Date:** 2026-11-21 · **Source:** the user (T-1014: "Այո թող ջնջվի 30 օր հետո") · **Status:** Accepted
+- **Context:** a user's video that is only processed (D-065) is downloaded from the recording's page. As an unpublished video, it was kept forever (D-057), so users' videos would fill the disk.
+- **Decision:**
+  - `[retention] processed_only_days = 30` (0 = keep forever). That many days after a user's job ended (Done, Failed or Cancelled), the daily cleanup removes:
+    - the job's folder `data/jobs/<id>/` (the processed video, audio, thumbnail);
+    - the uploaded files: the upload's folder `data/recordings/<upload>/`.
+  - Only folders Reel made for an upload are removed. A file in a watched folder is never removed by this rule; D-021 governs those.
+  - The title, chapters, description, transcripts (365 days) and history stay. The cleanup writes a `cleanup` event with the kinds removed.
+  - **The user is told:**
+    - The upload page says the video is kept 30 days.
+    - While processing runs, the recording's page says the video is kept 30 days after it is ready.
+    - When it is ready, the page says "download it before <date>".
+    - Afterwards, the page says when the video and files were deleted. Re-running is then not offered.
+  - A job still in progress or on hold is not counted; the 30 days start when it ends.
+  - The rule applies only to recordings that are not published (`publish = false`). Published accounts keep D-057.
+- **Rejected:** deleting only the processed video and keeping the uploaded original. The user has the original; keeping it would still fill the disk.

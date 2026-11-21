@@ -6,9 +6,9 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 55 of 57 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 56 of 58 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1013 — Accounts: registration, users, admin pages (D-065, 2026-11-21 17:08) |
+| **Last completed task** | T-1014 — A user's processed video is deleted after 30 days (D-066, 2026-11-21 17:24) |
 | **Current task** | — (the user brings a new lesson video to check the terms) |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
@@ -207,6 +207,26 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 17:24 — T-1014 A user's processed video is deleted after 30 days (user request, D-066) — DONE
+
+The user, after the T-1013 report: "Այո թող ջնջվի 30 օր հետո", then "Գործարկիր սերվերը".
+
+- **Retention** (`retention.py`): `[retention] processed_only_days = 30` (0 = keep). For a
+  recording with `publish = false`, 30 days after the job ended (Done, Failed or Cancelled),
+  the daily cleanup removes the job folder ("processed video") and the upload's folder
+  `data/recordings/<upload>/` ("uploaded files"). Never files in a watched folder; never a
+  published account's video (D-057 stays). The `cleanup` event now lists the kinds removed.
+  `keep_until(job, days)` gives the date.
+- **Dashboard:**
+  - The upload page says the video is kept 30 days.
+  - The recording's page says "download it before <date>", or after the deletion when the
+    files were deleted. Re-running is no longer offered once the files are gone.
+- **Config:** `processed_only_days = 30` in `reel.toml` and `reel.example.toml`.
+  `reel cleanup --dry-run` on the real data: nothing to remove (the 3 recordings are the admin's).
+- **Tests:** 3 new in `test_retention.py` (30 days, only Reel's own upload folders, 0 = keep)
+  and 1 page test in `test_accounts.py`. Full suite: 1368 passed (-W error), ruff clean.
+- `reel serve` restarted with the new code (the user: "Գործարկիր սերվերը").
 
 ### 2026-11-21 17:08 — T-1013 Accounts: registration, users and the admin (user request, D-065) — DONE
 

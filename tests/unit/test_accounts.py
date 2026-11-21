@@ -3,7 +3,9 @@ account pages."""
 
 import json
 import re
+from datetime import timedelta
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,10 +21,13 @@ from reel.db import (
     Stage,
     init_database,
     open_database,
+    utcnow,
 )
+from reel.retention import cleanup
 from reel.web import create_app, texts
 from reel.web.forms import parse_registration
 from reel.web.security import LoginThrottle, hash_password
+from reel.web.views import local_text
 
 SECRET = "accounts-test-secret-" + "a" * 30
 TOKEN = re.compile(r'name="csrf_token" value="([^"]+)"')
@@ -207,6 +212,26 @@ def test_a_users_own_video_is_only_processed_and_can_be_downloaded(site):
     assert "Միայն մշակում" in page and f"/recordings/{job_id}/video?download=1" in page
     assert "<h2>Հրապարակում</h2>" not in page  # nothing is published
     assert client.get(f"/recordings/{job_id}/video?download=1").status_code == 200
+
+
+def test_the_page_says_until_when_a_users_video_is_kept_and_when_it_went(site):
+    """T-1014: a user's processed video is deleted 30 days after it is ready."""
+    client, _ = register(site)
+    assert "Մշակված տեսանյութը կպահվի 30 օր" in client.get("/upload").text
+    me = account(site.db, "anna.p@example.com").id
+    finished = utcnow() - timedelta(days=29)
+    job_id = own_job(site.db, me, finished_at=finished)
+    video = site.cfg.paths.data_dir / "jobs" / str(job_id) / "cleaned.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"\x00\x00\x00\x18ftypmp42")
+    until = local_text(finished + timedelta(days=30), ZoneInfo(site.cfg.settings.schedule.timezone))
+    page = client.get(f"/recordings/{job_id}").text
+    assert f"ներբեռնեք այն մինչև <strong>{until}</strong>" in page
+    cleanup(site.db, site.cfg, now=finished + timedelta(days=31))
+    page = client.get(f"/recordings/{job_id}").text
+    assert "Մշակված տեսանյութը և վերբեռնված ֆայլերը ջնջվել են" in page
+    assert "?download=1" not in page
+    assert client.get(f"/recordings/{job_id}/video").status_code == 404
 
 
 def test_a_user_cannot_use_the_admins_pages_and_actions(site):

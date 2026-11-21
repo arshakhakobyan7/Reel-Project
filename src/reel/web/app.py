@@ -48,7 +48,7 @@ from reel.db import (
 )
 from reel.db.enums import JobStatus, Stage
 from reel.queue.jobs import InvalidTransition, JobNotFound, JobQueue
-from reel.retention import on_youtube
+from reel.retention import keep_until, on_youtube
 from reel.stages.chapters import SPEECH_UNCLEAR, set_staff_chapters, video_duration
 from reel.web import accounts, api, detail, texts, uploads, views
 from reel.web.forms import ensure_group, parse_chapters, parse_group, parse_lesson
@@ -400,7 +400,10 @@ def create_app(
                 cutoff=cfg.settings.schedule.same_evening_cutoff,
                 budget_minutes=cfg.settings.budget.max_processing_minutes,
             )  # fmt: skip
-            on_tube = found is not None and on_youtube(s.get(Job, job_id))
+            job = s.get(Job, job_id) if found is not None else None
+            on_tube = job is not None and on_youtube(job)
+            days = cfg.settings.retention.processed_only_days
+            until = keep_until(job, days) if job is not None else None
         if found is None:
             raise StarletteHTTPException(404)
         context = {
@@ -410,6 +413,8 @@ def create_app(
             "groups": sorted(cfg.groups.groups, key=str.casefold),
             "video": detail.video_path(job_id, cfg.paths.data_dir) is not None,
             "on_youtube": on_tube,
+            "keep_days": days,  # a user's processed video is kept this long (T-1014)
+            "keep_until": views.local_text(until, ZoneInfo(cfg.settings.schedule.timezone)),
             "chapters_text": chapters_text,
             "speech_unclear": SPEECH_UNCLEAR,
             "chapter_rules": (

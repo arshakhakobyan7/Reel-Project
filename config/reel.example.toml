@@ -244,6 +244,7 @@ working_files_days = 30                    # audio, cleaned video; 0 = keep fore
 transcripts_days = 365                     # 0 = keep forever
 delete_source_recordings = false           # never delete the originals unless set to true
 source_recordings_days = 90                # used only when delete_source_recordings = true
+processed_only_days = 30                   # a user's processed video (not published) is deleted after it; 0 = keep
 
 [budget]                                   # NFR-8 (D-020)
 max_processing_minutes = 240.0             # alert when one recording takes longer

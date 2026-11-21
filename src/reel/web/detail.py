@@ -23,6 +23,8 @@ from reel.db import (
 )
 from reel.db.enums import JobStatus, Stage
 from reel.metrics import JobMetrics, load_job_metrics
+from reel.retention import EVENT as CLEANUP_EVENT
+from reel.retention import PROCESSED_VIDEO
 from reel.web import texts
 from reel.web.views import clock_text, local_text, pills, recording_title
 
@@ -96,6 +98,7 @@ class Detail:
     budget_minutes: float = 0.0
     publish: bool = True  # False: a user's upload, only processed (T-1013)
     uploader: str = ""  # who uploaded it in the dashboard
+    deleted: str = ""  # when the user's processed video was deleted (T-1014)
 
     @property
     def can_release(self) -> bool:
@@ -118,7 +121,7 @@ class Detail:
 
     @property
     def can_rerun(self) -> bool:
-        return self.status is not JobStatus.RUNNING
+        return self.status is not JobStatus.RUNNING and not self.deleted
 
     @property
     def can_retry_now(self) -> bool:
@@ -277,6 +280,14 @@ def load_detail(
             "stage": texts.STAGE_LABELS.get(event.stage, "") if event.stage else "",
             "message": event.message,
         })  # fmt: skip
+    for event in session.scalars(
+        select(JobEvent).where(JobEvent.job_id == job.id, JobEvent.kind == CLEANUP_EVENT)
+        .order_by(JobEvent.id.desc())
+    ):  # fmt: skip
+        kinds = (event.data or {}).get("kinds") or ()
+        if PROCESSED_VIDEO in kinds or "uploaded_files" in kinds:
+            detail.deleted = local_text(event.at, zone)
+            break
     (detail.cost,) = load_job_metrics(
         session, [job], zone=zone, cutoff=cutoff, budget_minutes=budget_minutes
     )

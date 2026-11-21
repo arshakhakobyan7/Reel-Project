@@ -12,7 +12,11 @@ What is removed, from jobs that ended (Done, Failed or Cancelled) long enough ag
 - **unfinished uploads** older than ``working_files_days``;
 - **source recordings**: only when ``retention.delete_source_recordings`` is true (D-021),
   only of Done jobs whose video is on YouTube, after ``source_recordings_days``, and only
-  files inside a watched folder or ``data/recordings``.
+  files inside a watched folder or ``data/recordings``;
+- **a user's video that is only processed** (``retention.processed_only_days``, 0 = keep;
+  T-1014, D-066): the job's folder (the processed video the user downloads) and the uploaded
+  files in ``data/recordings/<upload>/``, that many days after the job ended. The user was
+  told the date on the recording's page. Its title, chapters and history stay.
 
 Every removal is written as a ``cleanup`` event on the job (events themselves are never
 deleted, so their ids are never reused; note from T-801). ``reel cleanup --dry-run`` only
@@ -38,11 +42,12 @@ log = logging.getLogger("reel.retention")
 
 ENDED = (JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED)
 EVENT = "cleanup"
+PROCESSED_VIDEO = "processed_video"  # the kind of removal the recording's page reports
 
 
 @dataclass(frozen=True)
 class Removal:
-    kind: str  # working_files, transcripts, upload, source
+    kind: str  # working_files, transcripts, upload, source, processed_video, uploaded_files
     detail: str
     bytes: int = 0
     job_id: int | None = None
@@ -96,6 +101,23 @@ def _only_copy(job: Job) -> bool:
 ONLY_COPY = "the video is not on YouTube, so this PC has the only copy"
 
 
+def keep_until(job: Job, days: int) -> datetime | None:
+    """When a user's processed video is deleted (T-1014), or None when it is kept."""
+    if not days or job.recording.publish or job.status not in ENDED:
+        return None
+    moment = job.finished_at or job.updated_at
+    return moment + timedelta(days=days) if moment is not None else None
+
+
+def _uploaded_folders(job: Job, recordings: Path) -> list[Path]:
+    """The ``data/recordings/<upload>/`` folders that hold the recording's files."""
+    files = [Path(p["path"]) for p in (job.recording.media_info or {}).get("parts", [])]
+    files = files or [Path(job.recording.source_path)]
+    root = recordings.resolve()
+    folders = {path.resolve().parent for path in files}
+    return sorted(folder for folder in folders if folder.parent == root and folder.is_dir())
+
+
 def plan(
     db: Database, cfg: LoadedConfig, now: datetime, kept: list[str] | None = None
 ) -> list[Removal]:
@@ -106,9 +128,24 @@ def plan(
     jobs_dir = paths.data_dir / "jobs"
     with db.transaction() as s:
         jobs = s.scalars(select(Job).where(Job.status.in_(ENDED)).order_by(Job.id)).all()
+        users = settings.processed_only_days
+        if users:  # a user's video that is only processed (T-1014)
+            for job in jobs:
+                until = keep_until(job, users)
+                if until is None or until > now:
+                    continue
+                folder = jobs_dir / str(job.id)
+                if folder.is_dir() and any(folder.iterdir()):
+                    removals.append(Removal(PROCESSED_VIDEO, f"job {job.id} processed video",
+                                            _size(folder), job.id, folder))  # fmt: skip
+                for upload in _uploaded_folders(job, paths.data_dir / RECORDINGS):
+                    text = f"job {job.id} uploaded files {upload.name}"
+                    removals.append(Removal("uploaded_files", text, _size(upload), job.id, upload))
         if settings.working_files_days:
             limit = now - timedelta(days=settings.working_files_days)
             for job in jobs:
+                if users and not job.recording.publish:
+                    continue  # the rule above
                 folder = jobs_dir / str(job.id)
                 if _ended_before(job, limit) and folder.is_dir() and any(folder.iterdir()):
                     if _only_copy(job):
@@ -130,6 +167,8 @@ def plan(
             for job in jobs:
                 if job.status is not JobStatus.DONE or not _ended_before(job, limit):
                     continue
+                if users and not job.recording.publish:
+                    continue  # its uploaded files go with the rule above
                 recording = job.recording
                 files = [Path(p["path"]) for p in (recording.media_info or {}).get("parts", [])]
                 files = files or [Path(recording.source_path)]
@@ -173,7 +212,7 @@ def _events(db: Database, removals: list[Removal], now: datetime) -> None:
             s.add(JobEvent(
                 job_id=job_id, at=now, kind=EVENT, actor_kind=ActorKind.SYSTEM,
                 message=f"retention: removed {', '.join(r.kind for r in done)} ({freed:.0f} MB)",
-                data={"removed": [r.detail for r in done]},
+                data={"removed": [r.detail for r in done], "kinds": [r.kind for r in done]},
             ))  # fmt: skip
 
 
