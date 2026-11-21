@@ -30,6 +30,7 @@ MAX_REPEATS = 2
 # Text that compresses this well is a repetition loop ("աստ, աստ, աստ, ..."); Whisper's own
 # threshold. Without temperature fallback such windows are kept by Whisper, so Reel drops them.
 MAX_COMPRESSION_RATIO = 2.4
+ECHO_MIN = 20  # characters: a shorter text inside the prompt may be real speech
 _models: dict[tuple[str, str, int], Any] = {}
 _models_lock = threading.Lock()
 
@@ -62,6 +63,11 @@ def _load(path: Path, compute_type: str, cpu_threads: int) -> Any:
                 str(path), device="cpu", compute_type=compute_type, cpu_threads=cpu_threads
             )
         return _models[key]
+
+
+def _echo(text: str, prompt: str) -> bool:
+    """Whisper sometimes writes the prompt itself on a quiet or unclear window."""
+    return len(text) >= ECHO_MIN and text.casefold() in prompt.casefold()
 
 
 def load_wav(path: Path) -> Any:
@@ -129,7 +135,10 @@ class WhisperTranscriber(Transcriber):
             "language": language,
             "task": "transcribe",
             "beam_size": stt.beam_size,
-            "initial_prompt": prompt or None,
+            # Every window gets the prompt as hotwords; initial_prompt reaches only the
+            # first, because condition_on_previous_text is off (D-062).
+            "initial_prompt": None if stt.hotwords else (prompt or None),
+            "hotwords": (prompt or None) if stt.hotwords else None,
             "condition_on_previous_text": False,
             "vad_filter": stt.vad,
             "word_timestamps": stt.word_timestamps,
@@ -140,7 +149,7 @@ class WhisperTranscriber(Transcriber):
             options["hallucination_silence_threshold"] = 2.0
         with self._lock:
             pieces, info = model.transcribe(load_wav(audio), **options)
-            segments, looping = [], 0
+            segments, looping, echoes = [], 0, 0
             for piece in pieces:  # decoding happens while iterating
                 if on_progress:
                     on_progress(float(piece.end))
@@ -148,6 +157,11 @@ class WhisperTranscriber(Transcriber):
                     check()
                 if piece.compression_ratio > MAX_COMPRESSION_RATIO:
                     looping += 1
+                    continue
+                # A window cut inside an Armenian letter leaves U+FFFD; drop it.
+                text = " ".join(piece.text.replace("\ufffd", "").split())
+                if _echo(text, prompt):
+                    echoes += 1
                     continue
                 words = tuple(
                     Word(
@@ -163,7 +177,7 @@ class WhisperTranscriber(Transcriber):
                     Segment(
                         start,
                         max(float(piece.end), start),
-                        piece.text.strip(),
+                        text,
                         words,
                         float(piece.avg_logprob),
                         float(piece.no_speech_prob),
@@ -178,9 +192,12 @@ class WhisperTranscriber(Transcriber):
             "language_probability": round(float(info.language_probability), 4),
             "audio_seconds": round(float(info.duration), 3),
             "speech_seconds": round(float(info.duration_after_vad), 3),
-            "dropped_segments": dropped + looping,
+            "dropped_segments": dropped + looping + echoes,
             "dropped_loops": looping,
-            "options": {k: v for k, v in options.items() if k != "initial_prompt"},
+            "dropped_prompt_echoes": echoes,
+            "options": {
+                k: v for k, v in options.items() if k not in {"initial_prompt", "hotwords"}
+            },
         }
         return Transcription(language, tuple(kept), self.name, details)
 

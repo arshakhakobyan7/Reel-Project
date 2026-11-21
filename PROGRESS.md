@@ -9,7 +9,7 @@
 | **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (dry-run; publishing stays local until the user says). 51 of 53 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
 | **Last completed task** | T-1009 — Why the video did not reach YouTube; typed groups added; transcript off the page (2026-11-20 20:25) |
-| **Current task** | — (the user opens the firewall port, starts Reel and checks the design and HTTPS) |
+| **Current task** | T-1010 English terms in the transcript — paused by the user 2026-11-21 14:35; resume from the log entry |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
 | **Waiting for approval** | Since 2026-11-20 14:10: report after each task and wait for the user's OK before the next. |
@@ -207,6 +207,42 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 14:35 — T-1010 English terms in the transcript (user request) — IN PROGRESS, paused by the user
+
+The user: Whisper writes English programming terms in Armenian letters ("դիկշնարի", "հեշտեբլ").
+They must stay English, in Latin letters, spelled right, never translated.
+
+**Done (committed as work in progress, tests: 1301 passed, ruff clean):**
+- `src/reel/stt/terms.py`: `TermFixer` turns Armenian-letter spellings into the English term and
+  keeps the Armenian ending after a hyphen ("դիկշների" → "dictionary-ների"); letter folding for
+  long spellings, exact match for short ones; multi-word terms word by word. 32 unit tests.
+- `transcribing.py` runs the fixer (`[stt] fix_terms = true`), records `term_fixes` in the details
+  and metrics. `whisper.py` drops U+FFFD and segments that repeat the prompt.
+- The chapter-title prompt asks for terms in Latin letters.
+
+**Trial on 4 min of job 2 (data/trial/terms/, local):**
+
+| Variant | Words | Note |
+|---|---|---|
+| v0 no prompt | 294 | full speech; with the fixer 38 terms fixed — the best |
+| v1 initial_prompt | 299 | the same as v0; the prompt only reaches the first 30 s window |
+| v2 hotwords long | 246 | speech lost |
+| v3 hotwords example | 264 | speech lost |
+| v4 hotwords short | 260 | speech lost + a "hash-fu, hash-fu…" loop |
+| final (hotwords ~200 tokens) | 220 | 25 % lost: the prompt eats the 448-token window |
+
+**Decision so far:** hotwords off; the fixer does the work. The live `config/reel.toml` already
+has `hotwords = false`; the schema default and the example config still say `true`.
+
+**Next (when the user resumes):**
+1. Schema default `hotwords = False`, example config, tests (`test_whisper_options.py`).
+2. Add the missed spellings: "հեշպունթյա(ն)", "հեշվունկթյա", "հեշտեբել", "հեշտ հեպլ", "կլեկշոն",
+   "դատա ստրուկտուր", "դոբեկտ", "կի վալու", "մյութբլ", "սայզ", "բակետ", "սլոթ".
+3. D-062 in DECISIONS, T-1010 DONE, commit.
+4. Restart the production `reel serve` (it runs the old code; check for running jobs first).
+5. Ask the user: re-transcribe job 2 (already on YouTube)? The external test instance runs the
+   old code; restarting it changes the tunnel URL.
 
 ### 2026-11-20 20:45 — Review of Codex's external test (tools/public-test, authorized by the user)
 - **Setup checked:**

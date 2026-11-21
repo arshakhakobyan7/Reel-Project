@@ -64,7 +64,13 @@ beam_size = 1                              # 5 was slower and not better for Arm
 temperature_fallback = false               # true re-decodes unsure windows: up to 3x slower
 vad = true                                 # skip silences (voice activity detection)
 word_timestamps = false                    # true = word timings, +55 % transcription time
-initial_prompt = ""                        # extra vocabulary for all groups (see groups.toml)
+# Vocabulary for all groups; the group's own (groups.toml) comes first. With the example
+# sentence it must stay under about 220 Whisper tokens, or its end is cut (D-062).
+initial_prompt = "Python, list, tuple, dict, dictionary, string, hash table, hash function, hashable, mutable, immutable, type, data type, object, class, function, method, index, slot, bucket, collision, reference, data structure, capacity, size, key-value, stack, stack frame, call stack, recursion, LIFO, FIFO, pop, print, input, output, error, while"
+hotwords = true                            # the prompt goes to every 30 s window (D-062)
+fix_terms = true                           # Armenian-letter spellings of English terms -> English
+# term_example = "..."                     # the Armenian sentence that shows terms in Latin letters
+# [stt.terms] adds spellings, for example: "call stack" = ["կոլ ստեկ"]; object = [] drops one
 
 [llm]                                      # local LLM through Ollama (D-004)
 provider = "ollama"

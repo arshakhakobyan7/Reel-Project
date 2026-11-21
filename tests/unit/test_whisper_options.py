@@ -74,8 +74,32 @@ def test_temperature_fallback_setting(setup, fallback, expected):
     transcriber, model, audio = setup([], temperature_fallback=fallback, beam_size=1)
     transcriber.transcribe(audio, language="hy", prompt="Python, list")
     assert model.options.get("temperature") == expected
-    assert model.options["beam_size"] == 1 and model.options["initial_prompt"] == "Python, list"
+    assert model.options["beam_size"] == 1 and model.options["hotwords"] == "Python, list"
+    assert model.options["initial_prompt"] is None
     assert model.options["condition_on_previous_text"] is False
+
+
+def test_the_prompt_goes_to_every_window_unless_hotwords_are_off(setup):
+    # condition_on_previous_text is off, so initial_prompt would reach only the first window
+    transcriber, model, audio = setup([], hotwords=False)
+    transcriber.transcribe(audio, language="hy", prompt="Python, list")
+    assert model.options["initial_prompt"] == "Python, list" and model.options["hotwords"] is None
+    transcriber, model, audio = setup([])
+    transcriber.transcribe(audio, language="hy")
+    assert model.options["initial_prompt"] is None and model.options["hotwords"] is None
+    assert "hotwords" not in transcriber.transcribe(audio, language="hy").details["options"]
+
+
+def test_prompt_echoes_and_broken_letters_are_dropped(setup):
+    prompt = "Այսօր Python-ում կխոսենք dictionary-ների մասին։ Python, list"
+    transcriber, _model, audio = setup([
+        piece(0, 2, "Բարև ձեզ, \ufffd"),  # a window cut inside a letter
+        piece(2, 6, "Այսօր Python-ում կխոսենք dictionary-ների մասին։"),  # the prompt itself
+        piece(6, 9, "Python"),  # too short to be an echo: real speech
+    ])  # fmt: skip
+    result = transcriber.transcribe(audio, language="hy", prompt=prompt)
+    assert [s.text for s in result.segments] == ["Բարև ձեզ,", "Python"]
+    assert result.details["dropped_prompt_echoes"] == 1
 
 
 def test_automatic_cpu_threads_leave_two_free():

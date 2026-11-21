@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from reel.config import load_config
+from reel.config.schema import TERM_EXAMPLE
 from reel.db import (
     Job,
     JobStatus,
@@ -28,6 +29,7 @@ CONFIG = """
 [stt]
 initial_prompt = "Ծրագրավորում"
 model = "{model}"
+{stt_extra}
 
 [workers]
 max_attempts = 2
@@ -52,8 +54,8 @@ class SlowFake(FakeTranscriber):
 def make(project, write_config):
     opened = []
 
-    def make(factory, *, folder="Python 12", audio_seconds=600.0, model="tiny"):
-        write_config(CONFIG.format(model=model))
+    def make(factory, *, folder="Python 12", audio_seconds=600.0, model="tiny", stt_extra=""):
+        write_config(CONFIG.format(model=model, stt_extra=stt_extra))
         cfg = load_config(project / "config" / "reel.toml")
         init_database(cfg.paths.database_file)
         db = open_database(cfg.paths.database_file)
@@ -104,8 +106,9 @@ def test_the_transcript_is_stored_and_the_job_moves_on(make, caplog):
         (cfg.paths.data_dir / "jobs" / str(job.id) / "transcript.raw.json").read_text("utf-8")
     )
     assert stored["segments"][2]["text"] == "Բարև ձեզ, սկսում ենք։"
-    # The prompt: [stt] initial_prompt plus the group's vocabulary from groups.toml.
-    assert fake.calls[0]["prompt"].startswith("Ծրագրավորում, Python, list")
+    # The prompt: the example sentence, the group's vocabulary, then [stt] initial_prompt.
+    prompt = fake.calls[0]["prompt"]
+    assert prompt.startswith(TERM_EXAMPLE + " Python, list") and prompt.endswith(", Ծրագրավորում")
     assert fake.calls[0]["language"] == "hy"
     assert run.metrics["segments"] == len(transcript.segments) and run.metrics["words"] > 0
     progress = run.metrics["progress"]  # saved by a heartbeat
@@ -116,7 +119,7 @@ def test_the_transcript_is_stored_and_the_job_moves_on(make, caplog):
 def test_a_job_without_a_known_group_uses_only_the_general_prompt(make):
     fake = FakeTranscriber()
     make(lambda cfg: fake, folder="Unknown")
-    assert fake.calls[0]["prompt"] == "Ծրագրավորում"
+    assert fake.calls[0]["prompt"] == TERM_EXAMPLE + " Ծրագրավորում"
 
 
 def test_missing_audio_fails_at_once(make):
@@ -133,6 +136,33 @@ def test_a_missing_model_fails_at_once_with_the_fix(make):
     assert job.status is JobStatus.FAILED and job.attempts == 1
     assert "speech model 'no-such-model' is not installed" in job.last_error
     assert "setup_whisper.py --model no-such-model" in job.last_error
+
+
+LESSON = [Segment(0, 4, "Խոսքը դիկշների մասին է"), Segment(4, 9, "Python-ում ամեն ինչ ոբեկտ է")]
+
+
+def test_english_terms_are_put_back_in_latin_letters(make):
+    _cfg, job, (run,), transcript, _ = make(lambda cfg: FakeTranscriber(LESSON))
+    assert [s.text for s in transcript.segments] == [
+        "Խոսքը dictionary-ների մասին է", "Python-ում ամեն ինչ object է",
+    ]  # fmt: skip
+    assert transcript.details["term_fixes"] == {
+        "դիկշների -> dictionary-ների": 1, "ոբեկտ -> object": 1,
+    }  # fmt: skip
+    assert run.metrics["term_fixes"] == 2
+    off = "fix_terms = false"
+    _cfg, _job, _runs, kept, _ = make(lambda cfg: FakeTranscriber(LESSON), stt_extra=off)
+    assert [s.text for s in kept.segments] == [s.text for s in LESSON]
+    assert kept.details["term_fixes"] == {}
+
+
+def test_more_spellings_come_from_the_config(make):
+    extra = "\n".join(["[stt.terms]", '"call stack" = ["կոլ ստեկ"]', "object = []"])
+    segments = [*LESSON, Segment(9, 12, "կոլ ստեկը լցվեց")]
+    _cfg, _job, _runs, transcript, _ = make(lambda cfg: FakeTranscriber(segments), stt_extra=extra)
+    assert [s.text for s in transcript.segments][1:] == [
+        "Python-ում ամեն ինչ ոբեկտ է", "call stack-ը լցվեց",  # object was dropped
+    ]  # fmt: skip
 
 
 def test_an_empty_transcript_is_flagged(make):

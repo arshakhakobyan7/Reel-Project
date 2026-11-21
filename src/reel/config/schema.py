@@ -27,6 +27,18 @@ FOOTER_FIELDS = frozenset({"group", "lesson", "date", "title"})
 POST_FIELDS = frozenset({"title", "url", "summary", "group", "lesson", "date", "duration"})
 
 _HTTP_URL = re.compile(r"^https?://\S+$")
+# An Armenian sentence that writes English terms in Latin letters, so Whisper does too (D-062).
+TERM_EXAMPLE = (
+    "Այսօր Python-ում կխոսենք dictionary-ների, hash table-ի և hash function-ի մասին։ "
+    "Key-երը պետք է լինեն hashable, immutable type-եր, ոչ թե mutable, օրինակ string, tuple։"
+)
+# Terms heard in the lessons. With the example it stays under Whisper's ~220-token prompt limit.
+TERM_VOCABULARY = (
+    "Python, list, tuple, dict, dictionary, string, hash table, hash function, hashable, "
+    "mutable, immutable, type, data type, object, class, function, method, index, slot, bucket, "
+    "collision, reference, data structure, capacity, size, key-value, stack, stack frame, "
+    "call stack, recursion, LIFO, FIFO, pop, print, input, output, error, while"
+)
 
 
 class Section(BaseModel):
@@ -198,7 +210,14 @@ class SttSettings(Section):
     temperature_fallback: bool = False
     vad: bool = True
     word_timestamps: bool = False  # +55 % transcription time (T-303)
-    initial_prompt: str = ""
+    initial_prompt: str = TERM_VOCABULARY  # for all groups; the group's own words come first
+    # English terms stay English (T-1010, D-062): the example sentence and the vocabulary go
+    # to every 30-second window ("hotwords"; false = only the first), and the Armenian-letter
+    # spellings that are left are replaced (reel.stt.terms; [stt.terms] adds spellings).
+    hotwords: bool = True
+    term_example: str = Field(default=TERM_EXAMPLE, max_length=400)
+    fix_terms: bool = True
+    terms: dict[str, tuple[str, ...]] = {}
 
 
 class LlmSettings(Section):

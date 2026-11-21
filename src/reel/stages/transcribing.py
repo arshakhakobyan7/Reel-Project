@@ -3,6 +3,10 @@
 Reads ``data/jobs/<id>/audio.wav`` (made by import), uses the group's vocabulary as the
 recognition prompt, reports progress (seconds of audio) through the heartbeat and every 10 %
 in the job log, and stores the result as ``transcript.raw.json`` and a ``raw`` transcript row.
+
+English terms stay English (T-1010, D-062): the prompt starts with an Armenian sentence that
+writes them in Latin letters, and the Armenian-letter spellings that are left are replaced
+(``reel.stt.terms``). The replacements are listed in the transcript's ``term_fixes``.
 """
 
 import time
@@ -14,6 +18,7 @@ from reel.db import Job, Stage, TranscriptKind
 from reel.queue.stage import StageContext, StageFailed, StageHandler, StageResult
 from reel.stages.importing import AUDIO_FILE
 from reel.stt import Transcriber, TranscriptError, save_transcript, wav_duration, write_json
+from reel.stt.terms import TermFixer, merge_terms, whisper_prompt
 from reel.stt.whisper import ModelMissing, make_transcriber
 
 RAW_FILE = "transcript.raw.json"
@@ -40,9 +45,8 @@ class TranscribeStage(StageHandler):
         stt = ctx.config.settings.stt
         found = ctx.config.groups.groups.get(group) if group else None
         vocabulary = found.vocabulary if found else ""
-        prompt = ", ".join(
-            text for text in (stt.initial_prompt.strip(), vocabulary.strip()) if text
-        )
+        # The example sentence, then the group's words, then the general ones (D-062).
+        prompt = whisper_prompt(stt.term_example, vocabulary, stt.initial_prompt)
         try:
             transcriber = self.factory(ctx.config)
         except ModelMissing as exc:
@@ -64,12 +68,19 @@ class TranscribeStage(StageHandler):
         )
         ctx.check()
         seconds = time.monotonic() - started
+        fixes: dict[str, int] = {}
+        if stt.fix_terms:
+            result, found = TermFixer(merge_terms(stt.terms)).fix_transcription(result)
+            fixes = {f"{wrong} -> {right}": count for (wrong, right), count in found.most_common()}
+            if fixes:
+                ctx.log.info("%d English terms put back in Latin letters", sum(fixes.values()))
         result = replace(
             result,
             details={
                 **result.details,
                 "seconds": round(seconds, 3),
                 "realtime_factor": round(seconds / total, 4) if total else None,
+                "term_fixes": fixes,
             },
         )
         write_json(ctx.job_dir / RAW_FILE, result)
@@ -85,6 +96,10 @@ class TranscribeStage(StageHandler):
                 "segments": len(result.segments),
                 "words": word_count,
                 "model": result.model,
+                "term_fixes": sum(fixes.values()),
             },
-            message=f"{len(result.segments)} segments, {word_count} words in {seconds:.0f} s",
+            message=(
+                f"{len(result.segments)} segments, {word_count} words in {seconds:.0f} s"
+                + (f", {sum(fixes.values())} terms fixed" if fixes else "")
+            ),
         )
