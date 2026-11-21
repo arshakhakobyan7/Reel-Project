@@ -70,6 +70,12 @@ echo "== models: Whisper $WHISPER_MODEL (+ tiny for the tests), the person detec
 as_reel "$APP/.venv/bin/python" "$APP/scripts/setup_whisper.py" --model "$WHISPER_MODEL"
 as_reel "$APP/.venv/bin/python" "$APP/scripts/setup_whisper.py" --model tiny
 as_reel "$APP/.venv/bin/python" "$APP/scripts/setup_person_model.py"
+# Reel appends to logs/ollama.log as the reel user whenever it starts Ollama. The ">>" below is
+# opened by this root shell, so give the file to reel first: a root-owned log makes every LLM
+# stage fail with PermissionError. This also repairs the log of an earlier install.
+touch "$APP/logs/ollama.log"
+chown reel:reel "$APP/logs/ollama.log"
+chmod 600 "$APP/logs/ollama.log"
 if ! as_reel env OLLAMA_MODELS="$APP/models/ollama" OLLAMA_HOST=127.0.0.1:11434 \
         "$APP/tools/ollama/bin/ollama" list 2>/dev/null | grep -q "^$LLM_MODEL"; then
     as_reel mkdir -p "$APP/data/ollama-home"
