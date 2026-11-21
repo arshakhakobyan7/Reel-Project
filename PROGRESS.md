@@ -208,6 +208,20 @@ ruff clean) and what was run on this PC.
 
 ## Log (newest first)
 
+### 2026-11-21 18:35 — T-1017 «Գլուխներ» → «Հատվածավորում» handed to GPT (user request)
+
+- **The user:** "Give a prompt that tells GPT to rename the «Գլուխներ» section to
+  «Հատվածավորում»".
+- The word «Գլուխներ» also names the stage and appears in flags, and the unclear-speech forms
+  say «բաժիններ». Asked the user how far to go: **only that section**.
+  - The heading becomes «Հատվածավորում».
+  - The empty text «Գլուխներ չկան։» becomes «Հատվածներ չկան։».
+- `handoff/T-1017.md`:
+  - it is done after T-1016, because both change `recording.html`;
+  - 3 tests, including that the stage name «Գլուխներ» stays in the pills (they use
+    `texts.STAGE_LABELS`, checked).
+- The live server shows it only after the review and a deploy to `ReelProject-live` (D-069).
+
 ### 2026-11-21 18:25 — Dashboard outage (500 from 18:17); the live server now runs from `ReelProject-live` (D-069)
 
 - **The user:** "my server does not start: is it GPT's work?"
