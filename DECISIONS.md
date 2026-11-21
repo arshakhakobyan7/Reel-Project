@@ -67,6 +67,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-060 | The dashboard on the local network: HTTPS from Reel itself, with its own name-constrained CA | user + agent | Accepted |
 | D-061 | A group typed in the dashboard is added to groups.toml at once; the transcript is not shown on the recording page | user | Accepted |
 | D-062 | English programming terms stay English in the transcript: a term fixer after Whisper; no prompt in every window | user + agent | Accepted |
+| D-063 | Board framing on a light wall: the board's frame lines; legs under a desk left out | user + agent | Accepted |
 
 ---
 
@@ -567,7 +568,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
     - The fine detail of each still (writing, slide text) is compared with the previous one. Changed detail is work. A window where most of the picture changed (the camera moved, the lights changed) is skipped.
   - **What is left out:**
     - isolated specks;
-    - small traces touching the picture's bottom edge, such as heads near the camera that the detector missed;
+    - small traces touching the picture's bottom edge, such as heads near the camera that the detector missed (since D-063 also larger ones that stand apart, such as legs under a desk);
     - groups of traces with less than 2 % of the work, such as a laptop on a table.
   - Writing inside a kept group is never trimmed. A first version cut off the outer 1 % on each side, which cut the edge of real writing in the trial lesson.
   - **The crop:** the work box gets a margin (6 % of its size, at least 2 % of the picture), is widened to 16:9 and kept inside the picture. The zoom is at most 2× (4K to 1080p keeps full detail). A crop that would keep more than 95 % of the width is not made.
@@ -646,3 +647,19 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
   - A bigger or English Whisper model: slower on this PC (T-303), and it would translate the Armenian speech.
   - Asking the LLM to fix the whole transcript: slow for a 2-hour lesson, and it may change the lecturer's words.
 - **Limits:** a spelling Whisper has not produced before stays in Armenian letters until it is added to the list (`[stt.terms]` or `TERMS`).
+
+### D-063 — Board framing on a light wall (amends D-058)
+- **Date:** 2026-11-21 · **Source:** the user ("why was the video not zoomed to the board?"), agent (T-1011) · **Status:** Accepted
+- **What happened:** the user's test recording (a white board on a light wall, a desk in front) was not zoomed at all. Two causes:
+  - The board (brightness 174) was within the surface tolerance of the wall beside it (164–167). Followed by brightness, the "board" ran over the wall to 98 % of the picture's width.
+  - The teacher's legs showed under the desk, below the detector's box, and moved. With little writing on the board they were 44 % of all the work, more than the 30 % up to which bottom-edge traces are dropped. The work box reached the bottom edge.
+- **Decision:**
+  - Traces touching the bottom edge are also dropped, whatever their share, when no other work lies in the 8 % of the picture's height above them. The whole strip from their top down goes, with the bits that do not touch the edge. Writing that reaches the bottom edge has more writing close above it and is kept.
+  - When the surface followed by brightness covers 92 % of the width or of the height, the board's frame is looked for on the still picture (`frame_lines`):
+    - the nearest long edge line above the work and below it (an edge over at least half of the work's width);
+    - how far these two lines run to the sides, across gaps up to 1.5 % of the width (not on along a chair beside the board);
+    - the outermost long upright edge within 3 % of where the lines end: the board's side, not the rails between its panels;
+    - a line that runs to the picture's edge means a board wider than the picture.
+  - Without a line above and below, the old rule stays: a surface that fills the picture both ways is the room, and only the work box is used.
+  - A board told apart by brightness (as in the first trial lesson, a dark board in a light room) is framed as before.
+- **Result:** the test recording: board 0.125–0.887 × 0.32–0.84 of the picture, zoom 1.24x, all four panels in the picture. IMG_0359: unchanged (1.12x).

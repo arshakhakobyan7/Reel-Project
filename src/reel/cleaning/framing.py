@@ -14,19 +14,24 @@ How, on the pictures of the board check (about one per second, 416 px wide, T-40
    compared with the previous still. Pixels whose detail changed by more than
    ``change_level`` are work. A window where most of the picture changed (the camera moved,
    the lights changed) is skipped.
-4. The work box is the box around the work pixels, without isolated specks, without small
-   traces that touch the picture's bottom edge (the heads of the people near the camera,
-   which the detector may miss), and without small groups of traces on their own (a laptop
-   on a table, a door): traces closer than ``GROUP_RADIUS`` form a group, and groups with
-   less than ``KEEP_SHARE`` of all the work are left out. Writing is never trimmed away
-   inside a kept group: a cut-off word is worse than a little more room.
+4. The work box is the box around the work pixels, without isolated specks, without traces
+   that touch the picture's bottom edge when they are few or stand apart from the rest (the
+   heads of the people near the camera, a teacher's legs under a desk: the detector may miss
+   them), and without small groups of traces on their own (a laptop on a table, a door):
+   traces closer than ``GROUP_RADIUS`` form a group, and groups with less than
+   ``KEEP_SHARE`` of all the work are left out. Writing is never trimmed away inside a kept
+   group: a cut-off word is worse than a little more room.
 5. The whole board is kept (the user's rule, D-058): starting from the work box, the
    surface it was written on (its brightness, taken from the unwritten parts of the work box)
    is followed outwards, row by row and column by column, while it covers most of the span.
    Thin gaps (the rails between sliding panels) are crossed; thin dark poles and legs cover
-   too little of a row to pull the box along. When the surface cannot be told from its
-   surroundings (a whole wall to write on, a white board on a white wall), it would fill the
-   picture, and only the work box is used.
+   too little of a row to pull the box along.
+6. When the surface is as bright as the wall around it (a white board on a light wall), it
+   runs over nearly the whole width or height. Then the board's frame is looked for instead
+   (T-1011): the nearest long edge line above and below the work, how far those lines run to
+   the sides, and the outermost long upright edge within that run (the board's side, not a
+   rail between panels). Without such lines, a surface that fills the picture both ways is
+   the room, and only the work box is used.
    :func:`crop_rect` adds the margin to the board (or work) box, widens it to the video's
    shape and limits the zoom.
 
@@ -54,7 +59,12 @@ SURFACE_GAP = (0.03, 0.04)  # gaps crossed: rows (share of height), columns (sha
 SURFACE_TOO_BIG = 0.92  # a surface this wide and tall is the room, not a board
 KEEP_SHARE = 0.02  # smaller groups (share of all the work) are left out
 BOTTOM_ROWS = 0.015  # traces reaching this share of the picture's bottom touch the edge ...
-BOTTOM_LIMIT = 0.3  # ... and are dropped when they are less than this share of all the work
+BOTTOM_LIMIT = 0.3  # ... and are dropped when they are less than this share of all the work,
+BOTTOM_GAP = 0.08  # ... or when no other work comes this close above them (share of height)
+LINE_STEP = 6.0  # brightness step between neighbouring pixels of the still that makes an edge
+LINE_COVER = 0.5  # an edge along this share of the span is a line of the board's frame
+LINE_GAP = 0.015  # share of the width: a frame line runs on across gaps this short
+LINE_REACH = 0.03  # share of the width: an upright line this far beyond the run still counts
 GRAY = np.array([0.114, 0.587, 0.299], np.float32)  # BGR
 
 
@@ -221,9 +231,80 @@ def board_box(
         if (x0n, y0n, x1n, y1n) == (x0, y0, x1, y1):
             break
         x0, y0, x1, y1 = x0n, y0n, x1n, y1n
-    if (x1 - x0) >= SURFACE_TOO_BIG * width and (y1 - y0) >= SURFACE_TOO_BIG * height:
-        return None, "the surface cannot be told from the room"
+    wide = (x1 - x0) >= SURFACE_TOO_BIG * width
+    tall = (y1 - y0) >= SURFACE_TOO_BIG * height
+    if wide or tall:  # the surface ran over the wall: look for the board's frame (T-1011)
+        lines = frame_lines(background, box)
+        if lines is not None:
+            return lines, f"board frame lines (surface {colour:.0f} like the room {room:.0f})"
+        if wide and tall:
+            return None, "the surface cannot be told from the room"
     return (x0, y0, x1, y1), f"board surface (brightness {colour:.0f}, room {room:.0f})"
+
+
+def _thick(strong: np.ndarray, axis: int) -> np.ndarray:
+    """An edge one pixel off still counts: each place also takes its two neighbours."""
+    thick = strong.copy()
+    ahead = [slice(None)] * 2
+    behind = [slice(None)] * 2
+    ahead[axis], behind[axis] = slice(1, None), slice(None, -1)
+    thick[tuple(ahead)] |= strong[tuple(behind)]
+    thick[tuple(behind)] |= strong[tuple(ahead)]
+    return thick
+
+
+def _line_band(cover: np.ndarray, start: int, step: int) -> tuple[int, int] | None:
+    """From ``start`` in the direction ``step``: the first band of places whose edge cover
+    reaches LINE_COVER, as (nearest, outermost), or None."""
+    index = start
+    while 0 <= index < len(cover) and cover[index] < LINE_COVER:
+        index += step
+    if not 0 <= index < len(cover):
+        return None
+    nearest = index
+    while 0 <= index + step < len(cover) and cover[index + step] >= LINE_COVER:
+        index += step
+    return nearest, index
+
+
+def _side(cover: np.ndarray, end: int, reach: int, outward: int) -> int:
+    """The outermost upright line within ``reach`` of where the frame's lines end, else the
+    end itself. Lines further in (rails between panels) are not the board's side."""
+    places = range(max(0, end - reach), min(len(cover), end + reach + 1))
+    found = [x for x in places if cover[x] >= LINE_COVER]
+    if not found:
+        return end
+    return min(found) if outward < 0 else max(found) + 2  # an edge lies between x and x + 1
+
+
+def frame_lines(
+    background: np.ndarray, box: tuple[int, int, int, int]
+) -> tuple[int, int, int, int] | None:
+    """The board's frame around the work ``box`` (pixels) from the long edge lines of the
+    still picture, or None when no line runs above and below the work (T-1011)."""
+    height, width = background.shape
+    x0, y0, x1, y1 = box
+    across = _thick(np.abs(np.diff(background, axis=0)) > LINE_STEP, 0)  # between y and y + 1
+    upright = _thick(np.abs(np.diff(background, axis=1)) > LINE_STEP, 1)  # between x and x + 1
+    cover = across[:, x0:x1].mean(axis=1)
+    above = _line_band(cover, y0 - 1, -1)
+    below = _line_band(cover, y1 - 1, 1)
+    if above is None or below is None:
+        return None
+    top, bottom = above[1], min(height, below[1] + 2)
+    # How far the two lines run to the sides, across short gaps (a smudge, a missing bit of
+    # frame), but not on along the edges of things nearby (a chair beside the board).
+    gap = max(1, round(LINE_GAP * width))
+    left, right = x0, x1
+    for band in (above, below):
+        line = across[min(band) : max(band) + 1].any(axis=0).astype(np.float32)
+        start, end = _grow(line, x0, x1, gap)
+        left, right = min(left, start), max(right, end)
+    reach = round(LINE_REACH * width)
+    sides = upright[top:bottom].mean(axis=0)
+    left = 0 if left <= reach else min(x0, _side(sides, left, reach, -1))
+    right = width if right >= width - reach else max(x1, _side(sides, right, reach, 1))
+    return left, top, min(width, right), bottom
 
 
 def _touching_bottom(mask: np.ndarray) -> np.ndarray:
@@ -308,9 +389,19 @@ class WorkCollector:
         solid = seen & (_neighbours(seen) >= 3)  # isolated specks are noise
         details: dict[str, Any] = {"analysis_size": [self.width, self.height]}
         bottom = _touching_bottom(solid)
-        if bottom.any() and bottom.sum() < BOTTOM_LIMIT * solid.sum():
-            details["dropped_at_bottom"] = round(float(bottom.sum() / solid.sum()), 4)
-            solid &= ~bottom
+        if bottom.any():
+            # Apart: no work in the rows just above them (legs under a desk, T-1011). Then
+            # the whole strip from their top down goes, with the bits not touching them.
+            top = int(np.flatnonzero(bottom.any(axis=1))[0])
+            near = max(0, top - round(BOTTOM_GAP * self.height))
+            if solid[:near].any() and not solid[near:top].any():
+                bottom = np.zeros_like(solid)
+                bottom[top:] = solid[top:]
+            elif bottom.sum() >= BOTTOM_LIMIT * solid.sum():
+                bottom = np.zeros_like(solid)  # a large share that is not apart: kept
+            if bottom.any():
+                details["dropped_at_bottom"] = round(float(bottom.sum() / solid.sum()), 4)
+                solid &= ~bottom
         share = float(solid.mean())
         if self.windows < 2:
             return FramingResult(None, "too short to compare", self.windows, self.skipped,

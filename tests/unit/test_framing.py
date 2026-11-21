@@ -11,6 +11,7 @@ from reel.cleaning.framing import (
     _box_blur,
     board_box,
     crop_rect,
+    frame_lines,
     union,
 )
 from reel.config.schema import FramingSettings
@@ -248,3 +249,74 @@ def test_the_collector_finds_the_board_of_a_lesson():
     board = result.board
     assert (round(board.x0 * W), round(board.y0 * H)) == (20, 15)
     assert (round(board.x1 * W), round(board.y1 * H)) == (140, 75)
+
+
+# --- T-1011: a white board on a light wall, legs under a desk --------------------------------
+
+
+def test_legs_under_a_desk_are_left_out_even_when_they_are_much_of_the_work():
+    """A teacher behind a desk: the legs show under it, outside the detector's box, and move.
+    In a lesson with little writing they were 44 % of the work and pulled the box down."""
+
+    class Legs(WorkCollector):
+        def add(self, frame, people=()):
+            frame = frame.copy()
+            if self.windows % 2:
+                frame[80:90, 40:120] = 240
+            super().add(frame, people)
+
+    plain = lesson(WorkCollector(SETTINGS, (W, H), 1.0))
+    with_legs = lesson(Legs(SETTINGS, (W, H), 1.0))
+    assert with_legs.box == plain.box
+    assert with_legs.details["dropped_at_bottom"] > 0.3
+
+
+def test_writing_that_reaches_the_bottom_edge_is_kept():
+    collector = WorkCollector(SETTINGS, (W, H), 1.0)
+    work = np.zeros((H, W), np.uint16)
+    work[30:72:4, 50:110] = 1  # lines of writing ...
+    work[31:72:4, 50:110] = 1
+    work[74:H, 50:110] = 1  # ... down to a large mark at the bottom edge, close below them
+    collector.work, collector.windows = work, 2
+    result = collector.finish()
+    assert result.box.y1 == 1.0 and "dropped_at_bottom" not in result.details
+
+
+def light_classroom(wall_value: float = 168.0) -> np.ndarray:
+    """A white board (x 20-140, y 15-75) on a light wall, with a darker frame (x 19 and 140,
+    y 14 and 75), rails between its panels at x 60 and 100, and a dark chair at its left."""
+    picture = np.full((H, W), wall_value, np.float32)
+    picture[15:75, 20:140] = 175.0
+    picture[[14, 75], 19:141] = 150.0
+    picture[14:76, [19, 140]] = 150.0
+    picture[15:75, [60, 100]] = 150.0  # rails
+    picture[70:H, 2:15] = 60.0  # a chair; its top edge is near the board's bottom line
+    picture[73:H, 2:15] = 40.0
+    return picture
+
+
+def test_a_white_board_on_a_light_wall_is_found_by_its_frame():
+    work = np.zeros((H, W), bool)
+    work[30:50:4, 65:95] = True  # writing on the middle panel only
+    found, note = board_box(light_classroom(), work, (65, 30, 95, 50))
+    assert note.startswith("board frame lines"), note
+    x0, y0, x1, y1 = found
+    # the outer frame, not the rails, and not on along the chair; edges are found to +-2 px
+    assert abs(x0 - 19) <= 2 and abs(x1 - 141) <= 2
+    assert abs(y0 - 14) <= 2 and abs(y1 - 76) <= 2
+
+
+def test_frame_lines_need_a_line_above_and_below_the_work():
+    picture = light_classroom()
+    picture[15:H, 20:140] = 175.0  # the board goes on below the picture: no bottom line
+    picture[14:H, [19, 140]] = 150.0
+    assert frame_lines(picture, (65, 30, 95, 50)) is None
+
+
+def test_a_board_wider_than_the_picture_runs_to_its_edges():
+    picture = np.full((H, W), 168.0, np.float32)
+    picture[15:75, :] = 175.0
+    picture[[14, 75], :] = 150.0
+    found, note = board_box(picture, np.zeros((H, W), bool), (65, 30, 95, 50))
+    assert note.startswith("board frame lines")
+    assert (found[0], found[2]) == (0, W)

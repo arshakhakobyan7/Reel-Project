@@ -6,9 +6,9 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 52 of 54 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 53 of 55 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1010 — English programming terms stay English in the transcript (D-062, 2026-11-21) |
+| **Last completed task** | T-1011 — Board framing on a light wall (D-063, 2026-11-21 15:21) |
 | **Current task** | — (the user brings a new lesson video to check the terms) |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
@@ -207,6 +207,24 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 15:21 — T-1011 Board framing on a light wall (user request, D-063) — DONE
+
+The user asked why test.MOV was not zoomed to the board ("Այո, սկսիր" to the proposed fix).
+
+- **Causes:** the white board (brightness 174) was like the light wall beside it (164–167),
+  so the surface ran to 98 % of the width; and the teacher's legs under the desk (44 % of the
+  little work) pulled the work box to the bottom edge.
+- **Fix (`reel.cleaning.framing`):** bottom-edge traces with no work in the 8 % above them
+  are dropped whatever their share; when the brightness surface covers 92 % of the width or
+  height, `frame_lines` finds the board's frame: the nearest long edge lines above and below
+  the work, how far they run (gaps up to 1.5 %), and the outermost upright edge near their
+  ends (the board's side, not the panel rails).
+- **Checked on the saved work maps and stills (`data/trial/framing2/`):** test.MOV: board
+  0.125–0.887 × 0.32–0.84, zoom 1.24x (was none); IMG_0359: unchanged, 1.12x.
+- test.MOV processed again (trial DB, dry-run): `reel_videos/test_reel.mp4` now zoomed 1.24x,
+  all four panels in the picture.
+- 5 new tests in `tests/unit/test_framing.py`. Full suite: 1315 passed (-W error), ruff clean.
 
 ### 2026-11-21 14:54 — The user's test.MOV processed locally (trial, not in the real DB)
 
