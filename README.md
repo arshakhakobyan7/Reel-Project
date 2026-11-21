@@ -46,11 +46,15 @@ model run locally, so no lesson audio or transcript leaves the PC.
 
 ## Install
 
-Run these once in PowerShell, in the project folder. Everything, including tools and
-models, stays inside this folder.
+Get the code with [Git for Windows](https://git-scm.com/download/win). The repository is
+private, so its owner must first add your GitHub account as a collaborator.
+
+Run these once in PowerShell. Everything, including tools and models, stays inside the project
+folder.
 
 ```powershell
-cd ReelProject
+git clone https://github.com/arshakhakobyan7/Reel-Project.git
+cd Reel-Project
 py -V:3.14 -m venv .venv
 Set-Content .venv\pip.ini "[global]`r`nno-cache-dir = true"   # optional: no pip cache outside the project
 .venv\Scripts\python -m pip install -e .                       # add ".[dev]" for tests and lint
@@ -61,6 +65,7 @@ Set-Content .venv\pip.ini "[global]`r`nno-cache-dir = true"   # optional: no pip
 .venv\Scripts\python scripts\setup_person_model.py             # person detector, 20 MB
 
 .venv\Scripts\reel config init     # config\reel.toml, config\groups.toml and .env from the examples
+mkdir inbox                        # the watched folder (watch_folders in config\reel.toml)
 .venv\Scripts\reel db init         # the database data\reel.db
 .venv\Scripts\reel user add admin --admin --name "Admin"   # the admin's account (the password is asked)
 .venv\Scripts\reel config check    # checks everything; fix what it reports

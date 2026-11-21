@@ -9,7 +9,7 @@
 | **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 59 of 61 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
 | **Last completed task** | T-1017 — «Հատվածավորում» section heading (GPT, reviewed; 2026-11-21 19:10) |
-| **Current task** | T-1018 — Reel on a Google Cloud Free Trial VM for a few days (D-070); code and deploy kit ready, waiting for the user's Google Cloud account |
+| **Current task** | T-1018 — on hold: the Google Cloud Free Trial needs a $30 prepayment for the user's card, and the user cancelled it. Code and deploy kit ready (any Ubuntu server); waiting for the user's choice of host |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
 | **Waiting for approval** | Since 2026-11-20 14:10: report after each task and wait for the user's OK before the next. |
@@ -207,6 +207,41 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-22 — The project on GitHub (user request)
+
+- **The user:** made the private repository `arshakhakobyan7/Reel-Project` and asked for the
+  whole project there, so that a friend can pull it and run it.
+- **Checked before the push:**
+  - Only committed files go (260). `.env`, `config/reel.toml`, `config/groups.toml`,
+    `config/google-client*.json`, `config/consent.json`, `data/`, `models/`, `tools/` and the
+    recordings stay ignored.
+  - No secret in any commit; only test placeholders.
+  - The repository is private (the public API answers 404) and was empty.
+- **A fresh clone was tested** in the scratchpad, following README:
+  - venv, `pip install -e ".[dev]"`, `reel config init`, `reel db init`, `reel config check`;
+  - the full suite: 1440 passed, 4 skipped (POSIX-only), -W error;
+  - only FFmpeg and the models were linked from this PC, in place of the setup scripts.
+- **README:**
+  - `git clone` with the repository's address, and the collaborator note;
+  - `mkdir inbox`, because `reel config check` failed on a fresh clone without it.
+- **Pushed:** `main` to `origin` (GitHub).
+- **Note:** the commits carry the author's Git email, which the repository's collaborators can
+  see.
+
+### 2026-11-22 — T-1018: the Google Cloud route is dropped (no cloud resources were created)
+
+- **Google Cloud:**
+  - At sign-up it asked for a one-time **$30 prepayment** for the user's card ("refundable if
+    the Cloud billing account is closed"). The console showed "Your Free Trial is pending —
+    Prepayment is needed".
+  - Adding another card did not help.
+  - The user did not pay and asked how to close the billing account and remove the card.
+    Claude gave the steps. The billing account "My Billing Account" is now **closed** (the
+    console says so; no projects linked). The user removes the card at payments.google.com.
+- **What stays:** the Linux readiness and `deploy/gcp/` (commit `41459d9`) work on any Ubuntu
+  24.04 server.
+- **Waiting:** the user's choice of where to run Reel, or to stop T-1018.
 
 ### 2026-11-22 — T-1018 Reel online for a few days (D-070) — IN PROGRESS: code and deploy kit ready
 
