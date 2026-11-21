@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 58 of 61 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 59 of 61 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1016 — "My page" /profile (GPT, reviewed; D-068, 2026-11-21 18:50) |
-| **Current task** | T-1017 — «Հատվածավորում» heading, GPT working on it (handoff/T-1017.md); Claude reviews it when the report comes |
+| **Last completed task** | T-1017 — «Հատվածավորում» section heading (GPT, reviewed; 2026-11-21 19:10) |
+| **Current task** | — (offered: ID-only logging instead of usernames/emails) |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
 | **Waiting for approval** | Since 2026-11-20 14:10: report after each task and wait for the user's OK before the next. |
@@ -207,6 +207,23 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 19:10 — T-1017 «Հատվածավորում» (GPT) reviewed — DONE; deployed
+
+- **GPT's report** (`handoff/T-1017.report.md`):
+  - only the two strings in `recording.html` changed: `<h2>Հատվածավորում</h2>` and
+    «Հատվածներ չկան։»;
+  - 3 tests in `tests/unit/test_chapters_heading.py`. They check the heading and the list, the
+    empty text, and that the stage pill still says «Գլուխներ».
+- **Review:**
+  - the diff is exactly those two lines;
+  - the T-1016 cost condition is kept;
+  - no existing test changed;
+  - own run: ruff clean, 1430 passed (-W error).
+- The user asked to commit all uncommitted work. The commit holds the template, the test, the
+  report and these notes; nothing else was uncommitted.
+- Deployed to `ReelProject-live` (D-069). Before the restart, a check that no job runs (this
+  time with a working command).
 
 ### 2026-11-21 18:50 — T-1016 "My page" (GPT) reviewed — DONE; deployed to `ReelProject-live`
 

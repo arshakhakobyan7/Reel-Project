@@ -146,10 +146,10 @@
 {% if d.metadata %}
 <section class="grid">
   <div class="card">
-    <h2>Գլուխներ</h2>
+    <h2>Հատվածավորում</h2>
     {% if d.metadata.chapters %}
     <ol class="chapters">{% for at, name in d.metadata.chapters %}<li><span class="at">{{ at }}</span> {{ name }}</li>{% endfor %}</ol>
-    {% else %}<p class="muted">Գլուխներ չկան։</p>{% endif %}
+    {% else %}<p class="muted">Հատվածներ չկան։</p>{% endif %}
   </div>
   <div class="card">
     {% if d.metadata.has_thumbnail %}<img class="thumb" src="/recordings/{{ d.job_id }}/thumbnail" alt="Տեսանյութի նկարը">{% endif %}
