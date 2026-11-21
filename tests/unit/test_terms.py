@@ -36,6 +36,19 @@ def fixed(text):
         ("մեր սլոտների սայզի վրա", "մեր slot-ների size-ի վրա"),
         ("թապլը", "tuple-ը"),
         ("ռեվերանսով", "reference-ով"),
+        # Seen in the T-1010 trial (2026-11-21)
+        (
+            "եթե hashable չլինեն, հեշպունթյան չի կարող",
+            "եթե hashable չլինեն, hash function-ն չի կարող",
+        ),
+        ("հեշվունթյան", "hash function-ն"),
+        ("մենք հեշտեբելի միջոցով", "մենք hash table-ի միջոցով"),
+        ("Եմա հեշտ հեպլը, ինքը", "Եմա hash table-ը, ինքը"),
+        ("Կլեկշոնի միտքը", "Collection-ի միտքը"),
+        ("ատուկ դատա ստրուկտուրը։", "ատուկ data structure-ը։"),
+        ("ատուկ data-structure-ը։", "ատուկ data structure-ը։"),
+        ("մեզ հարկավոր էր կի վալու զույգեր", "մեզ հարկավոր էր key-value զույգեր"),
+        ("համարակալված լոտի մեջ", "համարակալված slot-ի մեջ"),
     ],
 )
 def test_real_spellings_become_english(heard, written):

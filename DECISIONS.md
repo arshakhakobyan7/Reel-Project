@@ -66,6 +66,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-059 | The LLM never cuts the lesson's start or end alone: the line it names must hold a configured phrase | user | Accepted |
 | D-060 | The dashboard on the local network: HTTPS from Reel itself, with its own name-constrained CA | user + agent | Accepted |
 | D-061 | A group typed in the dashboard is added to groups.toml at once; the transcript is not shown on the recording page | user | Accepted |
+| D-062 | English programming terms stay English in the transcript: a term fixer after Whisper; no prompt in every window | user + agent | Accepted |
 
 ---
 
@@ -620,3 +621,28 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
   - `reel auth status` lists each Google service's permissions. A permission unticked on Google's consent screen is shown as MISSING, with a warning. That day, only `youtube.upload` had been granted: playlists would have failed.
   - The user asked to remove the "Տառադարձում (մաքրված տեսանյութի ժամանակներով)" section from the recording page. The transcript itself stays in the database and the job folder, because chapters, the title and the description are made from it.
 
+### D-062 — English programming terms stay English in the transcript
+- **Date:** 2026-11-21 · **Source:** the user ("English terms are written in Armenian letters and wrong; fix them so they are right; only the terms are not translated"), agent (T-1010) · **Status:** Accepted
+- **What happened:** Whisper, told that the speech is Armenian, writes the English words a lecturer uses in Armenian letters, and differently each time: "hash table" came out as "հեշտեբլ", "հեշտեպլ" and "հեշ թե բլ" in one lesson. The mistakes went on into chapter titles and the description.
+- **The user's rule:** programming terms stay English, in Latin letters and spelled right; the Armenian text around them stays Armenian.
+- **Trial** (4 minutes of a real lesson, local, `data/trial/terms/`):
+
+  | How the prompt was given | Words kept (of ~295) | Terms |
+  |---|---|---|
+  | none | 294 | Armenian letters |
+  | first window only (`initial_prompt`) | 299 | Armenian letters, except a few at the start |
+  | every window (`hotwords`), long | 220–246 | more in Latin letters |
+  | every window, one short sentence | 260 | a "hash-fu, hash-fu, …" loop |
+
+  The prompt shares the 448-token budget of each 30-second window with the speech, so in every window it cut the speech short. Losing a tenth to a quarter of a lesson is worse than misspelled terms.
+- **Decision:**
+  - Whisper gets the prompt (an Armenian sentence with terms in Latin letters, the group's vocabulary, then `[stt] initial_prompt`) only in the first window. `[stt] hotwords = true` would send it to every window; it is off by default.
+  - After transcription, `TermFixer` (`reel.stt.terms`) replaces the Armenian-letter spellings with the English term and keeps the Armenian ending after a hyphen: "դիկշների" → "dictionary-ների", "հեշվունկթյայից" → "hash function-ից". On the trial clip it fixed 40 terms and changed no Armenian word.
+  - Whisper mixes up letters that sound alike (պ/բ/փ, տ/դ/թ, կ/գ/ք, …). Spellings of five letters or more are compared with those letters folded together; shorter ones must match exactly. A folded form that two terms share counts only when it is exact.
+  - The spellings come from real lessons. `[stt.terms]` adds spellings (`"call stack" = ["կոլ ստեկ"]`) or drops a built-in term (`object = []`). `[stt] fix_terms = false` turns the fixer off.
+  - The job's transcription details list what was changed (`term_fixes`), so a wrong fix can be found and its spelling dropped.
+  - The chapter-title prompt asks the LLM to write the terms in Latin letters.
+- **Rejected:**
+  - A bigger or English Whisper model: slower on this PC (T-303), and it would translate the Armenian speech.
+  - Asking the LLM to fix the whole transcript: slow for a 2-hour lesson, and it may change the lecturer's words.
+- **Limits:** a spelling Whisper has not produced before stays in Armenian letters until it is added to the list (`[stt.terms]` or `TERMS`).

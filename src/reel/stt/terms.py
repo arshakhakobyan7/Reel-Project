@@ -4,12 +4,13 @@ Told that the speech is Armenian, Whisper writes the English words a lecturer us
 Armenian letters, and differently each time: "hash table" came out as "հեշտեբլ", "հեշտեպլ"
 and "հեշ թե բլ" in one lesson. The user's rule: the terms stay English. Two steps:
 
-1. ``whisper_prompt`` builds the prompt that goes to every 30-second window as Whisper
-   "hotwords": an Armenian sentence that writes such terms in Latin letters, then the
-   vocabulary. On a real lesson this put most terms in Latin letters.
-2. ``TermFixer`` replaces the Armenian-letter spellings that are left with the English term
-   and keeps the Armenian ending after a hyphen: "դիկշների" -> "dictionary-ների",
-   "վունկթյայի" -> "function-ի".
+1. ``whisper_prompt`` builds the prompt for the first 30-second window: an Armenian sentence
+   that writes such terms in Latin letters, then the vocabulary. Sent to every window
+   ("hotwords") it put more terms in Latin letters, but it takes room from the speech: a
+   real lesson lost 10-25 % of its words, so that is off by default ([stt] hotwords).
+2. ``TermFixer`` replaces the Armenian-letter spellings with the English term and keeps the
+   Armenian ending after a hyphen: "դիկշների" -> "dictionary-ների",
+   "վունկթյայի" -> "function-ի". On 4 minutes of a lesson it fixed 38 terms.
 
 Whisper mixes up letters that sound alike in Armenian speech (պ/բ/փ, տ/դ/թ, կ/գ/ք, ...), so
 spellings of five letters or more are compared with those letters folded together. Shorter
@@ -33,12 +34,17 @@ TERMS: dict[str, tuple[str, ...]] = {
         "հեշտեպլ",
         "հեշթեբլ",
         "հեշտեյբլ",
+        "հեշտեբել",
         "հեշտ թեբլ",
+        "հեշտ հեպլ",
         "հեշ թե բլ",
         "hesh-table",
+        "hash-table",
     ),
     "hash function": (
         "հեշվունկթյա",
+        "հեշվունթյա",
+        "հեշպունթյա",
         "հեշվունկցիա",
         "հեշֆունկցիա",
         "հեշվանքշն",
@@ -53,12 +59,18 @@ TERMS: dict[str, tuple[str, ...]] = {
     "string": ("ստրինգ",),
     "list": ("լիստ",),
     "tuple": ("թապլ", "տապլ", "թյուպլ"),
-    "slot": ("սլոտ", "սլոթ", "ծլոտ"),
+    "slot": ("սլոտ", "սլոթ", "ծլոտ", "լոտ"),
     "bucket": ("բակետ",),
     "size": ("սայզ",),
     "type": ("թայփ", "թայպ", "տայպ"),
     "data type": ("դատաթայպ", "դատատայփ", "դատատայպ"),
-    "data structure": ("դատաստրուկտուրա", "դատաստրուկտուր", "դատա ստրուկտուրա"),
+    "data structure": (
+        "դատաստրուկտուրա",
+        "դատաստրուկտուր",
+        "դատա ստրուկտուրա",
+        "դատա ստրուկտուր",
+        "data-structure",
+    ),
     "object": ("օբյեկտ", "ոբյեկտ", "ոբեկտ", "օբեկտ", "objekt"),
     "class": ("կլաս", "քլաս"),
     "first-class": ("վրծկլաս", "վրսկլաս", "ֆըրստ քլաս"),
@@ -66,7 +78,7 @@ TERMS: dict[str, tuple[str, ...]] = {
     "method": ("մեթոդ",),
     "index": ("ինդեքս", "ինդեջ"),
     "reference": ("ռեվերանս", "հեվերանս", "ռեֆերանս", "ռեֆերենս", "ռեվերանց"),
-    "collection": ("կլեկշն", "քլեկշն", "կոլեկշն", "կլեկշըն"),
+    "collection": ("կլեկշն", "քլեկշն", "կոլեկշն", "կլեկշըն", "կլեկշոն"),
     "capacity": ("կափասիտի", "կապասիտի"),
     "stack": ("ստեկ", "ստեք", "սթեք", "սթեկ", "stec"),
     "stack frame": ("ստեկֆրեմ", "ստեկֆրեն", "ստեկ ֆրեմ"),
@@ -78,7 +90,7 @@ TERMS: dict[str, tuple[str, ...]] = {
     "input": ("ինպուտ", "ինփութ"),
     "output": ("աութպուտ", "աուտպուտ"),
     "print": ("պրինտ", "փրինտ"),
-    "key-value": ("q-value",),
+    "key-value": ("q-value", "կի վալու", "կի վելյու"),
     "open addressing": ("openadressing",),
     "Python": ("պայթն", "պայթոն", "պայթեն", "փայթն", "պայթըն"),
 }

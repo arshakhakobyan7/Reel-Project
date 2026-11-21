@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (dry-run; publishing stays local until the user says). 51 of 53 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 52 of 54 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1009 — Why the video did not reach YouTube; typed groups added; transcript off the page (2026-11-20 20:25) |
-| **Current task** | T-1010 English terms in the transcript — paused by the user 2026-11-21 14:35; resume from the log entry |
+| **Last completed task** | T-1010 — English programming terms stay English in the transcript (D-062, 2026-11-21) |
+| **Current task** | — (the user brings a new lesson video to check the terms) |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
 | **Waiting for approval** | Since 2026-11-20 14:10: report after each task and wait for the user's OK before the next. |
@@ -207,6 +207,20 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 14:48 — T-1010 English programming terms stay English in the transcript (D-062) — DONE
+
+Resumed after the pause below (the user: "continue T-1010"; re-processing job 2: "no need, I
+will bring a new video").
+
+- `[stt] hotwords` is now off by default (schema, example and live config): the prompt reaches
+  only the first 30-second window, because in every window it cut the speech by 10-25 %.
+- New spellings from the trial: "հեշպունթյա", "հեշվունթյա" (hash function), "հեշտեբել",
+  "հեշտ հեպլ", "hash-table" (hash table), "դատա ստրուկտուր", "data-structure",
+  "կլեկշոն" (collection), "կի վալու", "կի վելյու" (key-value), "լոտ" (slot).
+- On the trial clip the fixer now makes 40 fixes (was 38). All 40 are right; no Armenian word
+  was changed. Left in Armenian letters: "դոբեկտի" (two words run together), "կի վալուզ".
+- D-062 written; TASKS T-1010 DONE; 9 new test cases in `tests/unit/test_terms.py`. Full suite: 1310 passed (-W error), ruff clean.
 
 ### 2026-11-21 14:35 — T-1010 English terms in the transcript (user request) — IN PROGRESS, paused by the user
 

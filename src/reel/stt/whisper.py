@@ -135,8 +135,8 @@ class WhisperTranscriber(Transcriber):
             "language": language,
             "task": "transcribe",
             "beam_size": stt.beam_size,
-            # Every window gets the prompt as hotwords; initial_prompt reaches only the
-            # first, because condition_on_previous_text is off (D-062).
+            # initial_prompt reaches only the first window, because condition_on_previous_text
+            # is off; hotwords reach every window but cut the speech short there (D-062).
             "initial_prompt": None if stt.hotwords else (prompt or None),
             "hotwords": (prompt or None) if stt.hotwords else None,
             "condition_on_previous_text": False,

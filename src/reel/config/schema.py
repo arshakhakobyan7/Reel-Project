@@ -212,9 +212,10 @@ class SttSettings(Section):
     word_timestamps: bool = False  # +55 % transcription time (T-303)
     initial_prompt: str = TERM_VOCABULARY  # for all groups; the group's own words come first
     # English terms stay English (T-1010, D-062): the example sentence and the vocabulary go
-    # to every 30-second window ("hotwords"; false = only the first), and the Armenian-letter
-    # spellings that are left are replaced (reel.stt.terms; [stt.terms] adds spellings).
-    hotwords: bool = True
+    # to the first 30-second window, and the Armenian-letter spellings are replaced afterwards
+    # (reel.stt.terms; [stt.terms] adds spellings). hotwords = true sends the prompt to every
+    # window, but it takes room from the speech: a real lesson lost 10-25 % of its words.
+    hotwords: bool = False
     term_example: str = Field(default=TERM_EXAMPLE, max_length=400)
     fix_terms: bool = True
     terms: dict[str, tuple[str, ...]] = {}

@@ -74,16 +74,16 @@ def test_temperature_fallback_setting(setup, fallback, expected):
     transcriber, model, audio = setup([], temperature_fallback=fallback, beam_size=1)
     transcriber.transcribe(audio, language="hy", prompt="Python, list")
     assert model.options.get("temperature") == expected
-    assert model.options["beam_size"] == 1 and model.options["hotwords"] == "Python, list"
-    assert model.options["initial_prompt"] is None
+    assert model.options["beam_size"] == 1 and model.options["initial_prompt"] == "Python, list"
+    assert model.options["hotwords"] is None
     assert model.options["condition_on_previous_text"] is False
 
 
-def test_the_prompt_goes_to_every_window_unless_hotwords_are_off(setup):
-    # condition_on_previous_text is off, so initial_prompt would reach only the first window
-    transcriber, model, audio = setup([], hotwords=False)
+def test_the_prompt_goes_to_every_window_only_with_hotwords_on(setup):
+    # Hotwords cut the speech short in each window (D-062), so they are off by default
+    transcriber, model, audio = setup([], hotwords=True)
     transcriber.transcribe(audio, language="hy", prompt="Python, list")
-    assert model.options["initial_prompt"] == "Python, list" and model.options["hotwords"] is None
+    assert model.options["hotwords"] == "Python, list" and model.options["initial_prompt"] is None
     transcriber, model, audio = setup([])
     transcriber.transcribe(audio, language="hy")
     assert model.options["initial_prompt"] is None and model.options["hotwords"] is None
