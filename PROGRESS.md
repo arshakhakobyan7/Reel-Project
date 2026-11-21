@@ -208,6 +208,20 @@ ruff clean) and what was run on this PC.
 
 ## Log (newest first)
 
+### 2026-11-21 14:54 — The user's test.MOV processed locally (trial, not in the real DB)
+
+- The user: process Desktop/reel_videos/test.MOV and put the result in the same folder.
+- Run with a separate DB and folder (`data/trial_test`), publishing forced to dry-run (the live
+  config has YouTube on). Done in 80 s: 7:19 → 6:32 (47 s with nobody at the board and no
+  sound removed). Output: `reel_videos/test_reel.mp4` and `test_reel_chapters.txt`.
+- **Finding:** the audio has no speech: a steady room noise at about −45 dB for all 7 minutes.
+  Whisper's voice detection found nothing, also after +25 dB of gain; without it Whisper only
+  invented repeated words. So no transcript, no chapters, and the terms (T-1010) could not be
+  checked on this video.
+- **Gap:** such a job went to Done with no flag but `chapters_not_generated`. In live mode it
+  would have been uploaded to YouTube without chapters. Proposed: put a job whose transcript
+  is empty on hold ("no speech found") — waiting for the user's OK.
+
 ### 2026-11-21 14:48 — T-1010 English programming terms stay English in the transcript (D-062) — DONE
 
 Resumed after the pause below (the user: "continue T-1010"; re-processing job 2: "no need, I
