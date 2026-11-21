@@ -399,3 +399,24 @@ def test_the_admin_sees_who_uploaded_a_recording(site):
     assert "Վերբեռնել է" in page and "Աննա Պետրոսյան" in page
     with site.db.transaction() as s:
         assert s.get(Recording, s.get(Job, job_id).recording_id).publish is False
+
+
+def test_a_duplicate_says_why_without_another_accounts_details(site):
+    """T-1015: the page tells why a video was not processed again."""
+    client, _ = register(site)
+    me = account(site.db, "anna.p@example.com").id
+    admins = add_job(site.db, group="Python 12", lesson=1, status=JobStatus.DONE, stage=Stage.POST)
+    mine = own_job(site.db, me)
+    others, own = (own_job(site.db, me, status=JobStatus.CANCELLED, stage=Stage.IMPORT)
+                   for _ in range(2))  # fmt: skip
+    with site.db.transaction() as s:
+        s.get(Job, others).recording.duplicate_of_id = s.get(Job, admins).recording_id
+        s.get(Job, own).recording.duplicate_of_id = s.get(Job, mine).recording_id
+    page = client.get(f"/recordings/{others}").text
+    assert "Այս տեսանյութն արդեն կա Reel-ում, ուստի կրկին չի մշակվել։" in page
+    assert f'href="/recordings/{admins}"' not in page
+    link = f'Այս տեսանյութն արդեն վերբեռնված է՝ <a href="/recordings/{mine}">#{mine}</a>'
+    assert link in client.get(f"/recordings/{own}").text
+    admin = login(site, "admin", ADMIN_PASSWORD)
+    page = admin.get(f"/recordings/{others}").text
+    assert f'<a href="/recordings/{admins}">#{admins}</a>' in page

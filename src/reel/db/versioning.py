@@ -26,7 +26,7 @@ from reel.db.base import Base, utcnow
 from reel.db.engine import DEFAULT_BUSY_TIMEOUT, Database, DatabaseError
 from reel.db.models import AppMeta, SchemaVersion
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 VERSION_TABLE = SchemaVersion.__tablename__
 
 
@@ -67,10 +67,23 @@ def _accounts_and_owners(connection: Connection) -> None:
         connection.exec_driver_sql(statement)
 
 
+def _processed_hashes(connection: Connection) -> None:
+    """Version 3 (T-1015): a recording that is only processed keeps its hash apart from the
+    published ones, so the same file of another account is not taken for a duplicate."""
+    for statement in (
+        "ALTER TABLE recordings ADD COLUMN processed_hash VARCHAR(64)",
+        "CREATE INDEX ix_recordings_processed_hash ON recordings (processed_hash)",
+        "UPDATE recordings SET processed_hash = content_hash, content_hash = NULL "
+        "WHERE publish = 0 AND content_hash IS NOT NULL",
+    ):
+        connection.exec_driver_sql(statement)
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(
         2, "accounts: roles, contact details; recordings: uploader, publish", _accounts_and_owners
     ),
+    Migration(3, "recordings: processed_hash for videos only processed", _processed_hashes),
 )
 
 

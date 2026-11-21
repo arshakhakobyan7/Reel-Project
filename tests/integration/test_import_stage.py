@@ -13,6 +13,7 @@ from reel.db import (
     Job,
     JobStatus,
     Recording,
+    StaffUser,
     Stage,
     init_database,
     open_database,
@@ -60,10 +61,11 @@ class Env:
         self.queue = JobQueue.from_settings(self.db, self.cfg.settings.workers)
         self.attention = []
 
-    def add(self, path: Path) -> int:
-        """Queue a file the way the watcher does."""
+    def add(self, path: Path, owner: int | None = None, publish: bool = True) -> int:
+        """Queue a file the way the watcher does (or an upload of ``owner``)."""
         with self.db.transaction() as s:
-            recording = Recording(source_path=str(path), size_bytes=path.stat().st_size)
+            recording = Recording(source_path=str(path), size_bytes=path.stat().st_size,
+                                  uploaded_by_id=owner, publish=publish)  # fmt: skip
             s.add(recording)
             return create_job(s, recording).id
 
@@ -263,3 +265,99 @@ def test_a_part_that_is_not_a_video_fails_the_lesson(env):
     env.run()
     job, _ = env.job(job_id)
     assert job.status is JobStatus.FAILED and "part 02.mp4" in job.last_error
+
+
+# --- T-1015: a user's upload is compared only with the same account's recordings ----------
+
+
+def person(env: Env, name: str, role: str = "user", can_publish: bool = False) -> int:
+    with env.db.transaction() as s:
+        user = StaffUser(username=name, password_hash="x", role=role, can_publish=can_publish)
+        s.add(user)
+        s.flush()
+        return user.id
+
+
+def copy_of(env: Env, path: Path, name: str) -> Path:
+    copy = env.inbox / "copies" / f"{name}.mp4"
+    copy.parent.mkdir(exist_ok=True)
+    shutil.copyfile(path, copy)
+    return copy
+
+
+def set_status(env: Env, job_id: int, status: JobStatus) -> None:
+    with env.db.transaction() as s:
+        s.get(Job, job_id).status = status
+
+
+def test_a_users_upload_is_not_a_duplicate_of_another_accounts_video(env):
+    admin = person(env, "admin", role="admin")
+    anna, aram = person(env, "anna"), person(env, "aram")
+    first = lesson(env, "Python 12/Lecture 1.mp4")
+    digest = hashlib.sha256(first.read_bytes()).hexdigest()
+    published = env.add(first, owner=admin)
+    env.run()
+    annas = env.add(copy_of(env, first, "anna"), owner=anna, publish=False)
+    arams = env.add(copy_of(env, first, "aram"), owner=aram, publish=False)
+    env.run()
+    for job_id in (annas, arams):
+        job, recording = env.job(job_id)
+        assert (job.stage, job.status) == (Stage.TRANSCRIBE, JobStatus.QUEUED)
+        assert (recording.content_hash, recording.processed_hash) == (None, digest)
+        assert recording.duplicate_of_id is None
+    assert env.job(published)[1].content_hash == digest
+    # what is published is still published once (FR-4), whatever the users uploaded
+    again = env.add(copy_of(env, first, "admin"), owner=admin)
+    env.run()
+    job, recording = env.job(again)
+    assert job.status is JobStatus.CANCELLED
+    assert recording.duplicate_of_id == env.job(published)[1].id
+
+
+def test_a_user_uploading_the_same_file_again(env):
+    anna = person(env, "anna")
+    first = lesson(env, "Python 12/Lecture 1.mp4")
+    original = env.add(first, owner=anna, publish=False)
+    env.run()
+
+    def upload_again(name: str) -> tuple[Job, Recording]:
+        job_id = env.add(copy_of(env, first, name), owner=anna, publish=False)
+        env.run()
+        return env.job(job_id)
+
+    # the first one is still in progress: not processed twice
+    job, recording = upload_again("while-working")
+    assert job.status is JobStatus.CANCELLED
+    assert f"duplicate of recording {env.job(original)[1].id} (job {original}" in job.last_error
+    assert recording.duplicate_of_id == env.job(original)[1].id
+    # ready, and its video is here to download: still not processed twice
+    set_status(env, original, JobStatus.DONE)
+    video = env.cfg.paths.data_dir / "jobs" / str(original) / "cleaned.mp4"
+    video.write_bytes(b"v")
+    assert upload_again("while-ready")[0].status is JobStatus.CANCELLED
+    # its video was deleted after 30 days (T-1014): processed again
+    video.unlink()
+    job, recording = upload_again("after-deletion")
+    assert (job.stage, job.status, recording.duplicate_of_id) == (
+        Stage.TRANSCRIBE, JobStatus.QUEUED, None
+    )  # fmt: skip
+    # a cancelled or failed earlier one does not block either
+    set_status(env, job.id, JobStatus.CANCELLED)
+    later, _ = upload_again("after-cancel")
+    assert (later.stage, later.status) == (Stage.TRANSCRIBE, JobStatus.QUEUED)
+    set_status(env, later.id, JobStatus.FAILED)
+    assert upload_again("after-failure")[0].status is JobStatus.QUEUED
+
+
+def test_a_user_is_not_told_about_another_accounts_recording(env):
+    admin = person(env, "admin", role="admin")
+    vahe = person(env, "vahe", can_publish=True)  # publishes, so FR-4 applies to him
+    first = lesson(env, "Python 12/Lecture 1.mp4")
+    env.add(first, owner=admin)
+    env.run()
+    copy = env.add(copy_of(env, first, "vahe"), owner=vahe)
+    env.run()
+    job, recording = env.job(copy)
+    assert job.status is JobStatus.CANCELLED and recording.duplicate_of_id is not None
+    assert "duplicate of a recording of another account" in job.last_error
+    assert "Lecture 1" not in job.last_error and "job 1" not in job.last_error

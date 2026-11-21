@@ -141,8 +141,12 @@ class Recording(Base):
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     file_modified_at: Mapped[datetime | None]
     # SHA-256 of the file (FR-4). Empty until the import stage has hashed the file; unique
-    # once set, so the same content can never become two recordings.
+    # once set, so the same content can never be published twice. Only published recordings
+    # set it (T-1015).
     content_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
+    # T-1015: the SHA-256 of a recording that is only processed. Not unique: another account
+    # may upload the same file; it is compared only with the same account's recordings.
+    processed_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     duplicate_of_id: Mapped[int | None] = mapped_column(
         ForeignKey("recordings.id", ondelete="SET NULL")
     )
@@ -168,13 +172,13 @@ class Recording(Base):
     )
     duplicate_of: Mapped[Recording | None] = relationship(remote_side=[id])
 
-    @validates("content_hash")
-    def _check_hash(self, _key: str, value: str | None) -> str | None:
+    @validates("content_hash", "processed_hash")
+    def _check_hash(self, key: str, value: str | None) -> str | None:
         if value is None:
             return None
         value = value.strip().lower()
         if not _SHA256.fullmatch(value):
-            raise ValueError("content_hash must be a SHA-256 hex digest (64 hex characters)")
+            raise ValueError(f"{key} must be a SHA-256 hex digest (64 hex characters)")
         return value
 
 

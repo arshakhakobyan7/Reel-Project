@@ -17,6 +17,7 @@ from reel.db import (
     Job,
     JobEvent,
     PublicationTarget,
+    Recording,
     StaffUser,
     StageRun,
     utcnow,
@@ -99,6 +100,8 @@ class Detail:
     publish: bool = True  # False: a user's upload, only processed (T-1013)
     uploader: str = ""  # who uploaded it in the dashboard
     deleted: str = ""  # when the user's processed video was deleted (T-1014)
+    duplicate_of: int | None = None  # the job of the recording this one duplicates (T-1015)
+    duplicate_mine: bool = False  # that recording was uploaded by the same account
 
     @property
     def can_release(self) -> bool:
@@ -236,6 +239,12 @@ def load_detail(
     if recording.uploaded_by_id is not None:
         account = session.get(StaffUser, recording.uploaded_by_id)
         detail.uploader = (account.display_name or account.username) if account else ""
+    original = (
+        session.get(Recording, recording.duplicate_of_id) if recording.duplicate_of_id else None
+    )
+    if original is not None and original.job is not None:
+        detail.duplicate_of = original.job.id
+        detail.duplicate_mine = original.uploaded_by_id == recording.uploaded_by_id
     detail.cut = _cut_view(job)
     detail.metadata = _metadata(job)
     for check in session.scalars(

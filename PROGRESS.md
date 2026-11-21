@@ -6,9 +6,9 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 56 of 58 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 57 of 59 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1014 — A user's processed video is deleted after 30 days (D-066, 2026-11-21 17:24) |
+| **Last completed task** | T-1015 — Duplicates per account (D-067, 2026-11-21 17:52) |
 | **Current task** | — (the user brings a new lesson video to check the terms) |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
@@ -207,6 +207,37 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 17:52 — T-1015 Duplicates per account (user report, D-067) — DONE
+
+The user: a test from a user's page failed, because every uploaded video was cancelled. The
+cause was in the real DB. Account #2 uploaded `test.MOV` (job 4) and `IMG_0359_first15min.MOV`
+twice (jobs 5, 6). The admin had already processed those files (recordings 3 and 2), so the
+import stage cancelled them as duplicates (FR-4). The message was in English and named the
+admin's recording; recording 3 was itself cancelled. The user: fix it, but do not re-run
+#4–#6 ("ես այն ինքս կփորձարկեմ").
+
+- **Import** (`stages/importing.py`):
+  - A published recording is compared with the published hashes (`content_hash`, unique),
+    as before.
+  - A recording only processed stores `processed_hash`. It is compared only with the same
+    account's recordings in progress, or ready with the video still there (`own_original`).
+  - When the uploader may not open the original, the message says "a recording of another
+    account".
+- **Schema version 3** (`db/versioning.py`): `recordings.processed_hash` with an index; it
+  takes the hash of any recording only processed.
+- **Real database upgraded** 17:50, after checking that no job ran and no upload was open.
+  Backup `data/backups/reel-v2-20261121T135052Z.db`. `reel serve` restarted 17:51;
+  `/login` and `/register` answer 200.
+- **Page:** a cancelled duplicate says why in Armenian. The link to the original appears only
+  for one's own recording, or for an admin.
+- **Tests:** 3 import tests with real FFmpeg (another account's copy, the same user again:
+  in progress / ready / deleted / cancelled / failed, no details of another account), the
+  v2→v3 migration test, and 1 page test. Full suite: 1373 passed (-W error), ruff clean.
+- **Still open:**
+  - The `tools/public-test` database is still version 1; it needs `reel db upgrade` (to 3)
+    before that instance restarts.
+  - The history of jobs #4–#6 keeps the old English event text.
 
 ### 2026-11-21 17:24 — T-1014 A user's processed video is deleted after 30 days (user request, D-066) — DONE
 

@@ -58,12 +58,12 @@ def test_init_creates_the_database_and_its_folder(tmp_path):
     created, info = init_database(path)
     assert created
     assert info.state is SchemaState.CURRENT
-    assert info.version == SCHEMA_VERSION == 2
+    assert info.version == SCHEMA_VERSION == 3
     assert len(info.instance_id) == 32
     assert info.journal_mode == "wal"
     assert info.created_at is not None and info.created_at.tzinfo is not None
     assert query(path, "SELECT version, app_version, description FROM schema_versions") == [
-        (2, __version__, "initial schema")
+        (SCHEMA_VERSION, __version__, "initial schema")
     ]
 
 
@@ -264,7 +264,7 @@ def test_version_1_is_upgraded_to_roles_and_uploaders(tmp_path):
     version_1(path)
     assert inspect_database(path).state is SchemaState.OUTDATED
     result = upgrade_database(path)
-    assert (result.from_version, result.to_version) == (1, 2) and result.backup.is_file()
+    assert (result.from_version, result.to_version) == (1, 3) and result.backup.is_file()
     # every account so far had every right: all become admins
     assert query(path, "SELECT username, role, can_publish, email FROM staff_users") == [
         ("admin", "admin", 0, None),
@@ -287,3 +287,26 @@ def test_version_1_is_upgraded_to_roles_and_uploaders(tmp_path):
         users = list(s.scalars(select(StaffUser)))
         assert [u.username for u in users] == ["admin", "anna"]
         assert all(user.is_admin and user.publishes for user in users)
+
+
+def test_version_2_keeps_the_hash_of_a_video_only_processed_apart(tmp_path):
+    """T-1015: a user's recording does not hold the unique (published) hash any more."""
+    path = tmp_path / "old.db"
+    version_1(path)
+    upgrade_database(path, expected_version=2)
+    published, processed = "a" * 64, "b" * 64
+    execute(path, f"UPDATE recordings SET content_hash = '{published}' WHERE id = 2")
+    execute(path, f"UPDATE recordings SET publish = 0, content_hash = '{processed}' WHERE id = 1")
+    result = upgrade_database(path)
+    assert (result.from_version, result.to_version) == (2, 3)
+    assert query(path, "SELECT id, content_hash, processed_hash FROM recordings ORDER BY id") == [
+        (1, None, processed),
+        (2, published, None),
+    ]
+    fresh = tmp_path / "fresh.db"
+    init_database(fresh)
+    assert sorted(columns(path, "recordings")) == sorted(columns(fresh, "recordings"))
+    indexes = "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'ix_%' ORDER BY 1"
+    assert query(path, indexes) == query(fresh, indexes)
+    # two accounts may have the same file: the processed hash is not unique
+    execute(path, f"UPDATE recordings SET processed_hash = '{processed}'")

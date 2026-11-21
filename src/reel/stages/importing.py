@@ -2,6 +2,10 @@
 
 1. SHA-256 of the whole file, read in chunks (cancellable). The same content under another
    name or path is a duplicate: the job is cancelled with a reference to the original.
+   A published recording is compared with the published ones (FR-4: nothing is published
+   twice). A recording that is only processed (a user's upload, T-1013) is compared only with
+   the same account's recordings that are in progress or ready, so another account's copy
+   never blocks it, and a cancelled, failed or deleted one is processed again (T-1015).
 2. Validation (``reel.media.ffmpeg.validate``): an unusable file fails at once, with the reason.
 3. Media information, original duration and identification (group, lesson, date) are saved.
 4. The audio track is extracted to ``data/jobs/<job id>/audio.wav`` for transcription.
@@ -24,8 +28,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from reel.db import Job, Recording, Stage
+from reel.config.loader import ResolvedPaths
+from reel.db import Job, JobStatus, Recording, StaffUser, Stage
 from reel.ingest.identify import MISSING_LESSON, Identification, identify_recording
 from reel.media.ffmpeg import FfmpegCancelled, FfmpegError, InvalidMedia, extract_audio, validate
 from reel.queue.stage import Discard, StageContext, StageFailed, StageHandler, StageResult
@@ -210,20 +216,67 @@ class ImportStage(StageHandler):
         cannot both pass."""
         with ctx.db.transaction(immediate=True) as session:
             recording = session.get(Recording, ctx.recording_id)
-            original = session.scalars(
-                select(Recording).where(
-                    Recording.content_hash == content_hash, Recording.id != recording.id
-                )
-            ).first()
+            if recording.publish:
+                original = session.scalars(
+                    select(Recording).where(
+                        Recording.content_hash == content_hash, Recording.id != recording.id
+                    )
+                ).first()
+            else:
+                original = own_original(session, recording, content_hash, ctx.config.paths)
             if original is None:
-                recording.content_hash = content_hash
+                recording.content_hash = content_hash if recording.publish else None
+                recording.processed_hash = None if recording.publish else content_hash
                 recording.duplicate_of_id = None
                 return
             recording.duplicate_of_id = original.id
             job = f"job {original.job.id}" if original.job else "no job"
-            message = (
-                f"duplicate of recording {original.id} ({job}, {original.source_path}); "
-                "not processed again"
-            )
+            details = f"recording {original.id} ({job}, {original.source_path})"
+            message = f"duplicate of {details}; not processed again"
+            if not _may_see(session, recording, original):
+                # the uploader may not open the other account's recording (T-1015)
+                log.info("job %s: duplicate of %s", ctx.job_id, details,
+                         extra={"job_id": ctx.job_id})  # fmt: skip
+                message = "duplicate of a recording of another account; not processed again"
         log.info("job %s: %s", ctx.job_id, message, extra={"job_id": ctx.job_id})
         raise Discard(message)
+
+
+ACTIVE = (JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.ON_HOLD)
+
+
+def own_original(
+    session: Session, recording: Recording, content_hash: str, paths: ResolvedPaths
+) -> Recording | None:
+    """The same account's earlier recording of this content that is in progress, or ready
+    with its processed video still here (T-1015). A cancelled or failed one, or one whose
+    video was deleted (T-1014), does not count: the upload is processed again."""
+    from reel.stages.cleaning import CLEANED_FILE
+
+    candidates = session.scalars(
+        select(Recording)
+        .where(
+            Recording.processed_hash == content_hash,
+            Recording.id != recording.id,
+            Recording.uploaded_by_id == recording.uploaded_by_id,
+        )
+        .order_by(Recording.id)
+    )
+    for candidate in candidates:
+        job = candidate.job
+        if job is None:
+            continue
+        if job.status in ACTIVE:
+            return candidate
+        video = paths.data_dir / "jobs" / str(job.id) / CLEANED_FILE
+        if job.status is JobStatus.DONE and video.is_file():
+            return candidate
+    return None
+
+
+def _may_see(session: Session, recording: Recording, original: Recording) -> bool:
+    """Whoever uploaded ``recording`` may see ``original``: their own, or an admin."""
+    if recording.uploaded_by_id is None or recording.uploaded_by_id == original.uploaded_by_id:
+        return True
+    uploader = session.get(StaffUser, recording.uploaded_by_id)
+    return uploader is not None and uploader.is_admin

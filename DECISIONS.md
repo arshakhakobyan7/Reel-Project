@@ -71,6 +71,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-064 | Unclear speech: the job waits; staff publish it as it is, with chapters they set, or cancel it | user | Accepted |
 | D-065 | Accounts: open registration; users see their own uploads, which are only processed unless the admin allows publishing; the admin manages accounts | user | Accepted |
 | D-066 | A user's processed video and uploaded files are deleted 30 days after the job ended; the page tells the date | user | Accepted |
+| D-067 | Duplicates per account: a video only processed is compared only with the same account's videos in progress or ready | user | Accepted |
 
 ---
 
@@ -735,3 +736,18 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
   - A job still in progress or on hold is not counted; the 30 days start when it ends.
   - The rule applies only to recordings that are not published (`publish = false`). Published accounts keep D-057.
 - **Rejected:** deleting only the processed video and keeping the uploaded original. The user has the original; keeping it would still fill the disk.
+
+### D-067 — Duplicates per account (T-1015)
+- **Date:** 2026-11-21 · **Source:** the user's test, then "Այո, սկսիր" · **Status:** Accepted
+- **Problem:** a registered user uploaded files the admin had already processed. The import stage compared them with every recording (FR-4, D-032) and cancelled all three. The cancel message was in English and named the admin's recording and file. A cancelled original also blocked them.
+- **Decision:**
+  - **Published recordings** (the admin, accounts allowed to publish, watched folders) are compared with the published ones, as before. Nothing is published twice. `recordings.content_hash` (unique) is set only for them.
+  - **A recording only processed** has its hash in the new `recordings.processed_hash` column (schema version 3; not unique). It is compared only with the same account's recordings that are:
+    - in progress (queued, running, on hold), or
+    - ready, with the processed video still there.
+  - The same account's cancelled or failed recording, or one whose video was deleted after 30 days (D-066), does not count: the upload is processed again. Another account's copy never counts.
+  - **What the uploader is told:**
+    - A user who may not open the original sees no details of it. The stage message says "a recording of another account", and the details go only to the log.
+    - The recording's page explains in Armenian. The link to the original appears only for the uploader's own recording, or for an admin.
+  - The upgrade to version 3 moves the hash of any recording only processed to `processed_hash`.
+- **Not done (the user's call):** jobs #4–#6, cancelled as duplicates, are not run again. The user uploads the videos again to test.

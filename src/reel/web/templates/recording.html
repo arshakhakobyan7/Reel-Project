@@ -17,6 +17,7 @@
     {% if d.finished %}<span class="muted">· ավարտվել է՝ {{ d.finished }}</span>{% endif %}
   </p>
   {% if d.hold_reason %}<p class="hold"><strong>{{ d.hold_label }}</strong>{% if d.hold_message %}<br>{{ d.hold_message }}{% endif %}</p>{% endif %}
+  {% if d.duplicate_of and d.status.value == "cancelled" %}<p class="hold">{% if user.is_admin or d.duplicate_mine %}Այս տեսանյութն արդեն վերբեռնված է՝ <a href="/recordings/{{ d.duplicate_of }}">#{{ d.duplicate_of }}</a>, ուստի կրկին չի մշակվել։{% else %}Այս տեսանյութն արդեն կա Reel-ում, ուստի կրկին չի մշակվել։{% endif %}</p>{% endif %}
   {% if d.last_error and d.status.value in ("failed", "queued") %}<p class="problem">{{ d.last_error }}</p>{% endif %}
   {% if d.flags %}<ul class="flags">{% for code, label in d.flags %}<li class="flag" title="{{ code }}">{{ label }}</li>{% endfor %}</ul>{% endif %}
   <dl class="facts">
