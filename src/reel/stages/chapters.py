@@ -51,11 +51,12 @@ def speech_rate(transcript: Transcription, duration: float) -> tuple[int, float]
     return words, (words / (duration / 60) if duration > 0 else 0.0)
 
 
-def unclear_speech_message(words: int, duration: float) -> str:
+def unclear_speech_message(words: int, duration: float, *, publish: bool = True) -> str:
     minutes = max(1, round(duration / 60))
+    choice = "տեղադրել այսպես" if publish else "ավարտել մշակումն այսպես"
     return (
         f"Տեսանյութում խոսքը պարզ չէ ({words} ճանաչված բառ {minutes} րոպեում), դրա պատճառով "
-        "բաժիններ հնարավոր չեղավ գտնել։ Դիտեք տեսանյութը և որոշեք՝ տեղադրել այսպես (կարող "
+        f"բաժիններ հնարավոր չեղավ գտնել։ Դիտեք տեսանյութը և որոշեք՝ {choice} (կարող "
         "եք նշել բաժիններն ինքներդ), թե չեղարկել։"
     )
 
@@ -83,10 +84,11 @@ class ChaptersStage(StageHandler):
         with ctx.db.transaction() as session:
             recording = session.get(Job, ctx.job_id).recording
             group_name, lesson = recording.group_name, recording.lesson_number
-            recording_date = recording.recording_date
+            recording_date, publish = recording.recording_date, recording.publish
             transcript = load_transcript(session, ctx.job_id, TranscriptKind.CLEAN)
         group = cfg.groups.groups.get(group_name) if group_name else None
-        if group is None:
+        # A video that is only processed needs no playlist or channel: any group name will do.
+        if group is None and (publish or not group_name):
             raise Hold(IDENTIFICATION, missing_group_message(group_name, lesson is None))
         if lesson is None:
             raise Hold(
@@ -115,7 +117,7 @@ class ChaptersStage(StageHandler):
                     settings,
                     llm=llm,
                     prompts=cfg.prompts,
-                    vocabulary=group.vocabulary,
+                    vocabulary=group.vocabulary if group else "",
                     check=ctx.check,
                 )
             except LLMError as exc:
@@ -179,7 +181,7 @@ class ChaptersStage(StageHandler):
                 job.add_flag(flag)
         if unclear:
             log.info("speech not clear: %d words, %.1f per minute; staff decide", words, rate)
-            raise Hold(SPEECH_UNCLEAR, unclear_speech_message(words, duration))
+            raise Hold(SPEECH_UNCLEAR, unclear_speech_message(words, duration, publish=publish))
         return StageResult(
             metrics={
                 "chapters": len(chapters),

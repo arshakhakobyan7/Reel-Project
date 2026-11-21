@@ -221,3 +221,22 @@ def test_the_check_can_be_turned_off(setup):
     assert work(cfg, db, answers=[]) == []
     job, _ = load(db, job_id)
     assert (job.stage, job.status, job.flags) == (Stage.CONSENT, JobStatus.QUEUED, [NOT_GENERATED])
+
+
+def test_a_video_only_processed_needs_no_group_in_groups_toml(setup):
+    cfg, db, job_id, _ = setup(group="Իմ խումբը")
+    with db.transaction() as s:
+        s.get(Job, job_id).recording.publish = False  # a user's upload (T-1013)
+    assert work(cfg, db) == []
+    job, row = load(db, job_id)
+    assert (job.stage, job.status) == (Stage.CONSENT, JobStatus.QUEUED)
+    assert row.title == "Իմ խումբը · Դաս 14" and len(row.chapters) == 3
+
+
+def test_unclear_speech_of_a_video_only_processed_asks_to_finish(setup):
+    cfg, db, job_id, _ = setup(transcript=SILENT)
+    with db.transaction() as s:
+        s.get(Job, job_id).recording.publish = False
+    work(cfg, db, answers=[])
+    job, _ = load(db, job_id)
+    assert job.hold_reason == SPEECH_UNCLEAR and "ավարտել մշակումն այսպես" in job.hold_message

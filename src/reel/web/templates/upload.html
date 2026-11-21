@@ -3,6 +3,7 @@
 {% block title %}Վերբեռնել ձայնագրություն{% endblock %}
 {% block content %}
 <h1>Վերբեռնել ձայնագրություն</h1>
+{% if not publishes %}<p class="notice">Ձեր տեսանյութը կմշակվի, բայց չի տեղադրվի YouTube-ում։ Երբ պատրաստ լինի, այն կներբեռնեք ձայնագրության էջից։</p>{% endif %}
 <noscript><p class="error">Վերբեռնման համար browser-ում պետք է միացված լինի JavaScript-ը։</p></noscript>
 
 <form id="upload-form" class="card upload" data-chunk="{{ chunk_bytes }}">
@@ -15,7 +16,7 @@
     <label>Ամսաթիվ <input name="date" type="date"></label>
   </div>
   <datalist id="known-groups">{% for name in groups %}<option value="{{ name }}"></option>{% endfor %}</datalist>
-  <p class="muted small">Գրեք խմբի անունը կամ ընտրեք առաջարկվածներից։ groups.toml-ում չնշված խմբի համար playlist, Slack ալիք և Classroom դասընթաց նշված չեն։</p>
+  {% if publishes %}<p class="muted small">Գրեք խմբի անունը կամ ընտրեք առաջարկվածներից։ groups.toml-ում չնշված խմբի համար playlist, Slack ալիք և Classroom դասընթաց նշված չեն։</p>{% endif %}
   <label for="files">Ֆայլեր</label>
   <input id="files" name="files" type="file" multiple accept="{{ extensions }}" required>
   <p class="muted small">Մի դասի բոլոր մասերը ընտրեք միասին։ Դրանք կդասավորվեն ըստ ձայնագրման ժամանակի, իսկ հերթականությունը կարող եք փոխել ↑ ↓ կոճակներով։ Վերբեռնումը հաստատելը նշանակում է, որ դասն ամբողջական է։ Մեկ ֆայլի առավելագույն չափը՝ {{ "%g"|format(max_gb) }} ԳԲ։ Կապի խզման դեպքում վերբեռնումը կշարունակվի այնտեղից, որտեղ կանգնել էր։ Եթե էջը փակվի, նորից ընտրեք նույն ֆայլերը։</p>

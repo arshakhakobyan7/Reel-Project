@@ -8,12 +8,15 @@ looked broken; plain text shows what was typed and the server explains what is w
 import logging
 import re
 import unicodedata
+from dataclasses import dataclass
 from datetime import date
 
 from reel.config.groups import GroupsFile, add_group
 from reel.config.loader import LoadedConfig
 from reel.config.schema import MetadataSettings
+from reel.db import normalize_username
 from reel.metadata.text import Chapter, ChapterError, check_chapters, format_timestamp
+from reel.web.security import MIN_PASSWORD_LENGTH, PasswordError, check_password_rules
 
 log = logging.getLogger("reel.web")
 
@@ -127,3 +130,59 @@ def parse_chapters(text: str, duration: float, settings: MetadataSettings) -> li
         return check_chapters(chapters, duration, settings)
     except ChapterError as exc:  # a rule not explained above
         raise ValueError(str(exc)) from exc
+
+
+# --- registration (T-1013) ---------------------------------------------------------------
+
+MAX_NAME_LENGTH = 100
+MAX_EMAIL_LENGTH = 64  # the email is the account's username
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+_PHONE = re.compile(r"\+?[0-9][0-9 ()-]{3,23}[0-9]")
+
+
+@dataclass(frozen=True)
+class Registration:
+    first_name: str
+    last_name: str
+    email: str
+    phone: str | None
+    password: str
+
+    @property
+    def display_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+
+def _name(text: str, what: str) -> str:
+    name = _SPACES.sub(" ", unicodedata.normalize("NFC", text or "")).strip()
+    if not name:
+        raise ValueError(f"Գրեք ձեր {what}։")
+    if len(name) > MAX_NAME_LENGTH:
+        raise ValueError(f"{what.capitalize()} շատ երկար է (առավելագույնը {MAX_NAME_LENGTH} նիշ)։")
+    return name
+
+
+def parse_registration(
+    first_name: str, last_name: str, email: str, phone: str, password: str, again: str
+) -> Registration:
+    """What a new user typed in the registration form. Raises ValueError (Armenian)."""
+    first, last = _name(first_name, "անունը"), _name(last_name, "ազգանունը")
+    address = unicodedata.normalize("NFC", email or "").strip().casefold()
+    if not _EMAIL.fullmatch(address):
+        raise ValueError("Email-ը սխալ է. օրինակ՝ anna@example.com։")
+    if len(address) > MAX_EMAIL_LENGTH:
+        raise ValueError(f"Email-ը շատ երկար է (առավելագույնը {MAX_EMAIL_LENGTH} նիշ)։")
+    try:
+        normalize_username(address)
+    except ValueError:
+        raise ValueError("Email-ում թույլատրված են տառեր, թվեր և . _ @ + - նշանները։") from None
+    number = _SPACES.sub(" ", (phone or "").strip())
+    if number and not (_PHONE.fullmatch(number) and sum(c.isdigit() for c in number) >= 5):
+        raise ValueError("Հեռախոսահամարը սխալ է. օրինակ՝ +374 91 123456։")
+    if password != again:
+        raise ValueError("Գաղտնաբառերը չեն համընկնում։")
+    try:
+        check_password_rules(password)
+    except PasswordError:
+        raise ValueError(f"Գաղտնաբառը պետք է ունենա առնվազն {MIN_PASSWORD_LENGTH} նիշ։") from None
+    return Registration(first, last, address, number or None, password)

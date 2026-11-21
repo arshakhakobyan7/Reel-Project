@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Օգտատերեր{% endblock %}
+{% block content %}
+<h1>Օգտատերեր</h1>
+<p class="muted">Բոլոր հաշիվները։ Գրանցված օգտատիրոջ տեսանյութերը միայն մշակվում են, մինչև դուք թույլ տաք դրանք տեղադրել YouTube-ում։</p>
+<section class="card table table-panel">
+  {% if rows %}
+  <table>
+    <thead><tr><th>Անուն</th><th>Email / օգտանուն</th><th>Հեռախոս</th><th>Դեր</th><th>YouTube</th><th>Վիճակ</th><th>Ձայնագրություններ</th><th>Գրանցվել է</th><th>Վերջին մուտք</th></tr></thead>
+    <tbody>
+      {% for u in rows %}
+      <tr>
+        <td><a href="/admin/users/{{ u.id }}">{{ u.name }}</a></td>
+        <td>{{ u.email or u.username }}</td>
+        <td class="nowrap">{{ u.phone or "—" }}</td>
+        <td>{{ u.role }}</td>
+        <td>{% if u.publishes %}Տեղադրում է{% else %}<span class="muted">Միայն մշակում</span>{% endif %}</td>
+        <td>{% if u.active %}Ակտիվ{% else %}<span class="badge status-cancelled">Փակված</span>{% endif %}</td>
+        <td>{{ u.total }}{% if u.total %} <span class="muted small">(ընթացքում՝ {{ u.working }}, պատրաստ՝ {{ u.done }}{% if u.failed %}, ձախողված՝ {{ u.failed }}{% endif %})</span>{% endif %}</td>
+        <td class="nowrap">{{ u.created }}</td>
+        <td class="nowrap">{{ u.last_login or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">Հաշիվներ չկան։</p>{% endif %}
+</section>
+{% endblock %}

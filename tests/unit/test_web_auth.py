@@ -42,7 +42,7 @@ def site(project, write_config):
     db = open_database(cfg.paths.database_file)
     with db.transaction() as s:
         s.add(StaffUser(username="Anna", display_name="Աննա <b>Պ.</b>",
-                        password_hash=hash_password(PASSWORD)))  # fmt: skip
+                        password_hash=hash_password(PASSWORD), role="admin"))  # fmt: skip
     now = [START]
     app = create_app(db, lambda: cfg, SECRET, clock=lambda: now[0],
                      throttle=LoginThrottle(clock=lambda: now[0]))  # fmt: skip

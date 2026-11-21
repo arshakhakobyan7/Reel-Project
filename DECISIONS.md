@@ -69,6 +69,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-062 | English programming terms stay English in the transcript: a term fixer after Whisper; no prompt in every window | user + agent | Accepted |
 | D-063 | Board framing on a light wall: the board's frame lines; legs under a desk left out | user + agent | Accepted |
 | D-064 | Unclear speech: the job waits; staff publish it as it is, with chapters they set, or cancel it | user | Accepted |
+| D-065 | Accounts: open registration; users see their own uploads, which are only processed unless the admin allows publishing; the admin manages accounts | user | Accepted |
 
 ---
 
@@ -679,3 +680,39 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
   - Both publish actions work only on a job held for this reason. They are recorded as releases with a note ("published without chapters", "published with N chapters set by staff").
   - Consent is still checked after the decision: publishing never skips it.
 - **Rejected:** asking the LLM for chapters from the few words. With almost no text it would invent topics.
+
+### D-065 — Accounts: registration, users and the admin
+- **Date:** 2026-11-21 · **Source:** the user (T-1013) · **Status:** Accepted
+- **The user's rules:**
+  - People who have videos to process sign in to the dashboard. Without an account they register: first name, last name, email, phone (optional).
+  - A new account works at once, but its videos are not published to YouTube: the user gets the processed video back and downloads it.
+  - A user sees only their own recordings and decides on them, except consent.
+  - The admin (the user) sees the accounts and what they do, can close an account, and can let chosen accounts publish to YouTube.
+- **Decision:**
+  - **Roles.** An account is an `admin` or a `user` (`staff_users.role`). Schema version 2 adds the role, `can_publish`, first and last name, email (unique) and phone. The upgrade makes every existing account an admin, because they all had every right.
+  - **Registration** (`/register`, `[web] registration = true`):
+    - the email (lower case, at most 64 characters) is the username, so people sign in with it;
+    - the password follows the same rules as `reel user add` (at least 10 characters);
+    - the phone number may be empty;
+    - one address may make 5 accounts an hour;
+    - the new account is signed in at once.
+    - There is no email check: Reel sends no email (D-009), and the admin can close an account.
+  - **Uploads.** A recording has `uploaded_by_id` (the account) and `publish`. An upload is published when the account is an admin or the admin allowed it (`can_publish`). The upgrade links the uploads made so far to their accounts. A watched folder's recordings are published, as before.
+  - **Only processed** (`publish = false`):
+    - the Consent, Upload and Post stages do nothing and say so ("only processed");
+    - Chapters needs no group in `groups.toml`, so the typed group is not added there;
+    - the page offers the download and shows no publications;
+    - for unclear speech (D-064) the choices read "finish" instead of "publish".
+  - **What a user may do.**
+    - A user sees and opens only their own recordings: list, page, video, thumbnail and the upload API. Anything else is "not found".
+    - They may cancel, set the group and lesson, retry, and decide on unclear speech.
+    - Accepting a hold ("Ընդունել և շարունակել", which includes overriding consent), re-running a stage, the metrics and the accounts are the admin's only (403).
+  - **The admin's pages.**
+    - `/admin/users` lists every account: role, publishing, state, its recordings (all, in progress, ready, failed), registration and last sign-in.
+    - `/admin/users/<id>` shows one account: its details, recordings and last 50 actions with notes.
+    - There the admin closes or opens the account (a closed one cannot sign in; its sessions end at once, because every request reads the account), and allows or stops publishing for its new uploads.
+    - The admin cannot close their own account. An admin always publishes.
+- **Rejected:**
+  - Approving each new account by hand: the user wants new accounts to work at once. The risk is small, because they cannot publish.
+  - Email confirmation and password reset by email: they need a mail service. The admin resets a password with `reel user password`.
+- **Open:** a user's processed videos are kept like every unpublished video (D-057): they are not deleted automatically. A deadline for them would save disk space.

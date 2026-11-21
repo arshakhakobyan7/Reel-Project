@@ -115,9 +115,14 @@ def recordings_page(
     group: str | None = None,
     page: int = 1,
     configured_groups: tuple[str, ...] = (),
+    owner: int | None = None,
 ) -> ListPage:
+    """One page of the recordings list. ``owner``: only that account's uploads (T-1013)."""
     counts = {each: 0 for each in JobStatus}
-    for each, number in session.execute(select(Job.status, func.count()).group_by(Job.status)):
+    totals = select(Job.status, func.count()).join(Recording, Job.recording_id == Recording.id)
+    if owner is not None:
+        totals = totals.where(Recording.uploaded_by_id == owner)
+    for each, number in session.execute(totals.group_by(Job.status)):
         counts[each] = number
     latest = (
         select(CutList.job_id, func.max(CutList.version).label("version"))
@@ -130,6 +135,8 @@ def recordings_page(
         .outerjoin(latest, latest.c.job_id == Job.id)
         .outerjoin(CutList, (CutList.job_id == Job.id) & (CutList.version == latest.c.version))
     )
+    if owner is not None:
+        query = query.where(Recording.uploaded_by_id == owner)
     if status is not None:
         query = query.where(Job.status == status)
     if group == NO_GROUP:
@@ -168,8 +175,9 @@ def recordings_page(
                 [(flag, texts.FLAG_LABELS.get(flag, flag)) for flag in job.flags or ()],
             )
         )
-    stored = session.scalars(
-        select(Recording.group_name).where(Recording.group_name.is_not(None)).distinct()
-    ).all()
+    named = select(Recording.group_name).where(Recording.group_name.is_not(None))
+    if owner is not None:
+        named, configured_groups = named.where(Recording.uploaded_by_id == owner), ()
+    stored = session.scalars(named.distinct()).all()
     groups = sorted(set(stored) | set(configured_groups), key=str.casefold)
     return ListPage(rows, counts, sum(counts.values()), matching, page, pages, groups)

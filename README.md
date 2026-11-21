@@ -62,7 +62,7 @@ Set-Content .venv\pip.ini "[global]`r`nno-cache-dir = true"   # optional: no pip
 
 .venv\Scripts\reel config init     # config\reel.toml, config\groups.toml and .env from the examples
 .venv\Scripts\reel db init         # the database data\reel.db
-.venv\Scripts\reel user add anna --name "Աննա"   # a dashboard account (the password is asked)
+.venv\Scripts\reel user add admin --admin --name "Admin"   # the admin's account (the password is asked)
 .venv\Scripts\reel config check    # checks everything; fix what it reports
 ```
 
@@ -139,6 +139,18 @@ link. The file is `data\jobs\<job>\cleaned.mp4`, next to `thumbnail.jpg` and
 `metadata.json` (title, description, chapters). While publishing is dry-run, this is the
 only copy, and the daily cleanup does not remove it.
 
+**Accounts (T-1013, D-065).** The admin's account is made with `reel user add <name> --admin`.
+Other people register on the login page (**Գրանցվել**: first and last name, email, an
+optional phone number, a password) and sign in with their email at once. They see only their
+own recordings. Their videos are processed but not published: they download the result from
+the recording's page. Under **Օգտատերեր** the admin sees every account, its recordings and
+its recent actions, and can:
+
+- **Թույլ տալ տեղադրել YouTube-ում**: the account's new uploads are published like the admin's;
+- **Փակել հաշիվը**: the account cannot sign in any more; its open sessions end at once.
+
+`[web] registration = false` turns registration off.
+
 **When Reel needs staff.** It sends a Slack alert, and the recording shows one of these:
 
 | What you see | What to do |
@@ -165,7 +177,7 @@ the share done without staff, failures per stage and compute time. The time budg
 | `reel status [job] [--status failed]` | Jobs at a glance, or one job in detail. |
 | `reel rerun <job> --from <stage> --by <name>` | Run a job again from a stage. The stages are `import`, `transcribe`, `clean`, `chapters`, `consent`, `upload` and `post`. |
 | `reel release <job> [--accept]` / `reel cancel <job>` / `reel retry <job>` | The dashboard's actions, with `--by` and `--note` for the audit log. |
-| `reel user add/password/disable/enable/list` | Dashboard accounts. |
+| `reel user add [--admin]/password/disable/enable/list` | Dashboard accounts (`--admin`: sees everything, manages accounts). |
 | `reel cert [--name N] [--ip A] [--new-ca] [--show]` | The dashboard's HTTPS certificate for the local network (make, renew, show). |
 | `reel auth google` / `status [--check]` / `forget` | Connect to Google once, check the connection, or remove it. |
 | `reel cleanup [--dry-run]` | Retention, by hand. |

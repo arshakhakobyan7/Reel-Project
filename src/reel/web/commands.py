@@ -12,7 +12,15 @@ from sqlalchemy import func, select
 
 from reel.auth.store import SecretStore, SecretStoreError, make_secret_store
 from reel.config.loader import ConfigError, ConfigProvider, LoadedConfig, find_config_file
-from reel.db import Database, DatabaseError, StaffUser, normalize_username, open_database
+from reel.db import (
+    ROLE_ADMIN,
+    ROLE_USER,
+    Database,
+    DatabaseError,
+    StaffUser,
+    normalize_username,
+    open_database,
+)
 from reel.logging_setup import configure_from_config, register_secret
 from reel.web import tls
 from reel.web.security import MIN_SECRET_LENGTH, PasswordError, hash_password
@@ -57,6 +65,11 @@ def register(commands: argparse._SubParsersAction) -> None:
     add.add_argument("username")
     add.add_argument("--name", default="", help="display name")
     add.add_argument("--password-stdin", action="store_true", help="read the password from stdin")
+    add.add_argument(
+        "--admin", action="store_true",
+        help="an admin: sees every recording and the accounts (T-1013); else a user whose "
+        "uploads are only processed",
+    )  # fmt: skip
     add.set_defaults(handler=run_user_add)
     password = actions.add_parser("password", help="set a new password (ends the sessions)")
     password.add_argument("username")
@@ -111,11 +124,12 @@ def run_user_add(args: argparse.Namespace) -> int:
                 print(f"ERROR: the account {username!r} exists already", file=sys.stderr)
                 return 1
             s.add(StaffUser(username=username, display_name=args.name.strip() or None,
-                            password_hash=password_hash, is_active=True))  # fmt: skip
+                            password_hash=password_hash, is_active=True,
+                            role=ROLE_ADMIN if args.admin else ROLE_USER))  # fmt: skip
     except (ValueError, ConfigError, DatabaseError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    print(f"Account {username!r} added.")
+    print(f"Account {username!r} added ({'admin' if args.admin else 'user'}).")
     return 0
 
 
@@ -166,7 +180,7 @@ def run_user_list(args: argparse.Namespace) -> int:
         cfg, db = _open(args)
         with db, db.transaction() as s:
             users = [
-                (u.username, u.display_name or "", u.is_active, u.last_login_at)
+                (u.username, u.display_name or "", u.is_active, u.last_login_at, u.role)
                 for u in s.scalars(select(StaffUser).order_by(StaffUser.username))
             ]
     except (ConfigError, DatabaseError) as exc:
@@ -174,10 +188,10 @@ def run_user_list(args: argparse.Namespace) -> int:
         return 1
     if not users:
         print("No staff accounts. Add one with: reel user add <username>")
-    for username, name, active, last in users:
+    for username, name, active, last, role in users:
         state = "active" if active else "disabled"
         seen = last.strftime("%Y-%m-%d %H:%M UTC") if last else "never"
-        print(f"{username:<24} {state:<9} last login: {seen:<20} {name}")
+        print(f"{username:<24} {role:<6} {state:<9} last login: {seen:<20} {name}")
     return 0
 
 

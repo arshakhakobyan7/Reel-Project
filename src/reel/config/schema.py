@@ -500,6 +500,9 @@ class WebSettings(Section):
     session_hours: float = Field(default=12.0, gt=0, le=720)
     upload_max_gb: float = Field(default=20.0, gt=0, le=500)  # per file (T-807)
     tls: bool = False  # HTTPS with the certificate made by `reel cert` (T-1008, D-060)
+    # Anyone who opens the dashboard may make an account; its uploads are only processed
+    # until the admin lets it publish (T-1013, D-065).
+    registration: bool = True
 
     @model_validator(mode="after")
     def _https_with_tls(self) -> Self:

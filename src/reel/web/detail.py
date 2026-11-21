@@ -17,6 +17,7 @@ from reel.db import (
     Job,
     JobEvent,
     PublicationTarget,
+    StaffUser,
     StageRun,
     utcnow,
 )
@@ -93,6 +94,8 @@ class Detail:
     rerun_stages: list[tuple[str, str]] = field(default_factory=list)
     cost: JobMetrics | None = None
     budget_minutes: float = 0.0
+    publish: bool = True  # False: a user's upload, only processed (T-1013)
+    uploader: str = ""  # who uploaded it in the dashboard
 
     @property
     def can_release(self) -> bool:
@@ -226,6 +229,10 @@ def load_detail(
             "started": local_text(run.started_at, zone), "seconds": clock_text(seconds),
             "error": run.error or "", "worker": run.worker or "",
         })  # fmt: skip
+    detail.publish = recording.publish
+    if recording.uploaded_by_id is not None:
+        account = session.get(StaffUser, recording.uploaded_by_id)
+        detail.uploader = (account.display_name or account.username) if account else ""
     detail.cut = _cut_view(job)
     detail.metadata = _metadata(job)
     for check in session.scalars(

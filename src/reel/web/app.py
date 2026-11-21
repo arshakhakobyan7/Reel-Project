@@ -1,6 +1,10 @@
 """The staff dashboard's web app: login, logout, sessions, CSRF and the start page (T-802;
 FR-30, NFR-5, D-049).
 
+T-1013 (D-065): an admin sees every recording, the metrics and the accounts; a user who
+registered sees and changes only their own uploads, and cannot run the admin's actions
+(accept a hold for another reason, re-run a stage).
+
 Server-rendered Jinja2 pages with plain CSS, no JavaScript. Every page except the login
 page and the stylesheet needs a signed-in, active staff account; anonymous visitors are
 sent to the login page. Every POST is checked against the session's CSRF token.
@@ -9,7 +13,7 @@ sent to the login page. Every POST is checked against the session's CSRF token.
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Annotated, Any
@@ -32,13 +36,22 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from reel import __version__, metrics
 from reel.config.loader import LoadedConfig
-from reel.db import Database, Job, Recording, StaffUser, normalize_username, utcnow
+from reel.db import (
+    ROLE_ADMIN,
+    ROLE_USER,
+    Database,
+    Job,
+    Recording,
+    StaffUser,
+    normalize_username,
+    utcnow,
+)
 from reel.db.enums import JobStatus, Stage
 from reel.queue.jobs import InvalidTransition, JobNotFound, JobQueue
 from reel.retention import on_youtube
 from reel.stages.chapters import SPEECH_UNCLEAR, set_staff_chapters, video_duration
-from reel.web import api, detail, texts, uploads, views
-from reel.web.forms import ensure_group, parse_chapters, parse_lesson
+from reel.web import accounts, api, detail, texts, uploads, views
+from reel.web.forms import ensure_group, parse_chapters, parse_group, parse_lesson
 from reel.web.security import (
     LoginThrottle,
     Session,
@@ -75,10 +88,25 @@ class Staff:
     id: int
     username: str
     display_name: str
+    role: str = ROLE_USER
+    can_publish: bool = False
 
     @property
     def name(self) -> str:
         return self.display_name or self.username
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == ROLE_ADMIN
+
+    @property
+    def publishes(self) -> bool:
+        """Whether this account's uploads are published, not only processed (T-1013)."""
+        return self.is_admin or self.can_publish
+
+    @classmethod
+    def of(cls, user: StaffUser) -> Staff:
+        return cls(user.id, user.username, user.display_name or "", user.role, user.can_publish)
 
 
 @dataclass
@@ -89,6 +117,10 @@ class WebState:
     throttle: LoginThrottle
     secure_cookies: bool
     templates: Jinja2Templates
+    # New accounts per client address (T-1013): a few an hour, so nobody fills the database.
+    registrations: LoginThrottle = field(
+        default_factory=lambda: LoginThrottle(max_failures=5, window_seconds=3600)
+    )
 
 
 class NotSignedIn(Exception):
@@ -123,7 +155,7 @@ def _load_staff(db: Database, session: Session) -> Staff | None:
             or password_fingerprint(user.password_hash) != session.fingerprint
         ):
             return None
-        return Staff(user.id, user.username, user.display_name or "")
+        return Staff.of(user)
 
 
 def _check_login(db: Database, username: str, password: str) -> tuple[Staff, str] | None:
@@ -141,7 +173,7 @@ def _check_login(db: Database, username: str, password: str) -> tuple[Staff, str
         stored = user.password_hash if user is not None else None
         if not verify_password(password, stored) or user is None or not user.is_active:
             return None
-        return Staff(user.id, user.username, user.display_name or ""), password_fingerprint(stored)
+        return Staff.of(user), password_fingerprint(stored)
 
 
 def _mark_login(db: Database, user_id: int) -> None:
@@ -156,6 +188,25 @@ def staff(request: Request) -> Staff:
         path = request.url.path + (f"?{request.url.query}" if request.url.query else "")
         raise NotSignedIn(path)
     return user
+
+
+def admin(request: Request) -> Staff:
+    """Dependency: the signed-in admin (T-1013); other accounts get "only for the admin"."""
+    user = staff(request)
+    if not user.is_admin:
+        raise StarletteHTTPException(403, texts.ADMIN_ONLY)
+    return user
+
+
+def reachable(request: Request, job_id: int, user: Staff) -> None:
+    """A user reaches only their own uploads; for anything else it does not exist (404)."""
+    if user.is_admin:
+        return
+    with _state(request).db.transaction() as s:
+        job = s.get(Job, job_id)
+        owner = job.recording.uploaded_by_id if job is not None else None
+    if owner is None or owner != user.id:
+        raise StarletteHTTPException(404)
 
 
 async def csrf_guard(request: Request) -> None:
@@ -185,6 +236,7 @@ def render(request: Request, name: str, context: dict[str, Any], status: int = 2
         "csrf": request.state.session.csrf,
         "version": __version__,
         "texts": texts,
+        "registration": state.config().settings.web.registration,  # T-1013
         **context,
     }
     return state.templates.TemplateResponse(request, name, values, status_code=status)
@@ -325,6 +377,7 @@ def create_app(
                 s, ZoneInfo(cfg.settings.schedule.timezone), status=chosen,
                 group=group.strip() or None, page=page,
                 configured_groups=tuple(cfg.groups.groups),
+                owner=None if user.is_admin else user.id,
             )  # fmt: skip
         context = {
             "listing": listing,
@@ -384,6 +437,7 @@ def create_app(
         request: Request, job_id: int, user: Annotated[Staff, Depends(staff)], done: str = ""
     ) -> Response:
         """The detail page of one recording (T-804)."""
+        reachable(request, job_id, user)
         return detail_page(request, job_id, message=texts.DONE_MESSAGES.get(done))
 
     @app.get("/recordings/{job_id}/video")
@@ -391,6 +445,7 @@ def create_app(
         request: Request, job_id: int, user: Annotated[Staff, Depends(staff)], download: str = ""
     ) -> Response:
         """The cleaned video, for the page's player (with Range requests) or as a download."""
+        reachable(request, job_id, user)
         state = _state(request)
         with state.db.transaction() as s:
             job = s.get(Job, job_id)
@@ -406,6 +461,7 @@ def create_app(
     def thumbnail(
         request: Request, job_id: int, user: Annotated[Staff, Depends(staff)]
     ) -> Response:
+        reachable(request, job_id, user)
         state = _state(request)
         with state.db.transaction() as s:
             job = s.get(Job, job_id)
@@ -419,7 +475,7 @@ def create_app(
 
     @app.post("/recordings/{job_id}/release")
     def release(
-        request: Request, job_id: int, user: Annotated[Staff, Depends(staff)],
+        request: Request, job_id: int, user: Annotated[Staff, Depends(admin)],
         advance: Annotated[str, Form()] = "0", note: Note = "",
     ) -> Response:  # fmt: skip
         forward = advance == "1"
@@ -433,17 +489,19 @@ def create_app(
         request: Request, job_id: int, user: Annotated[Staff, Depends(staff)], note: Note = ""
     ) -> Response:
         """The speech was not clear (T-1012): publish the video as it is, without chapters."""
+        reachable(request, job_id, user)
         with _state(request).db.transaction() as s:
             job = s.get(Job, job_id)
             if job is None:
                 raise StarletteHTTPException(404)
-            waiting = _unclear(job)
+            waiting, published = _unclear(job), job.recording.publish
         if not waiting:
             log.info("staff %s: publish on job %s refused: not waiting", user.username, job_id)
             return detail_page(request, job_id, error=texts.ACTION_FAILED, status=409)
-        text = "published without chapters" + (f": {note.strip()}" if note.strip() else "")
+        text = ("published" if published else "finished") + " without chapters"
+        text += f": {note.strip()}" if note.strip() else ""
         return act(
-            request, job_id, user, "published",
+            request, job_id, user, "published" if published else "finished",
             lambda queue, by: queue.release(job_id, by, advance=True, note=text),
         )  # fmt: skip
 
@@ -454,6 +512,7 @@ def create_app(
     ) -> Response:  # fmt: skip
         """The speech was not clear (T-1012): staff set the chapters, then the video goes on to
         be published with them. A mistake in the list shows the page again with the text."""
+        reachable(request, job_id, user)
         state = _state(request)
         cfg = state.config()
         try:
@@ -466,14 +525,16 @@ def create_app(
                 items = parse_chapters(chapters, video_duration(job.video_metadata),
                                        cfg.settings.metadata)  # fmt: skip
                 listed = set_staff_chapters(job, items, cfg, user.username)
+                published = job.recording.publish
         except InvalidTransition as exc:
             log.info("staff %s: chapters on job %s refused: %s", user.username, job_id, exc)
             return detail_page(request, job_id, error=texts.ACTION_FAILED, status=409)
         except ValueError as exc:
             return detail_page(request, job_id, error=str(exc), status=422, chapters_text=chapters)
-        text = f"published with {len(listed)} chapters set by staff"
+        verb = "published" if published else "finished"
+        text = f"{verb} with {len(listed)} chapters set by staff"
         return act(
-            request, job_id, user, "chapters",
+            request, job_id, user, "chapters" if published else "chapters_finished",
             lambda queue, by: queue.release(job_id, by, advance=True, note=text),
         )  # fmt: skip
 
@@ -481,6 +542,7 @@ def create_app(
     def cancel(
         request: Request, job_id: int, user: Annotated[Staff, Depends(staff)], note: Note = ""
     ) -> Response:
+        reachable(request, job_id, user)
         return act(request, job_id, user, "cancelled",
                    lambda queue, by: queue.cancel(job_id, by, note=note.strip()))  # fmt: skip
 
@@ -490,10 +552,17 @@ def create_app(
         group: Annotated[str, Form()] = "", lesson: Annotated[str, Form()] = "",
         recorded: Annotated[str, Form()] = "", note: Note = "",
     ) -> Response:  # fmt: skip
+        reachable(request, job_id, user)
+
         def operation(queue: JobQueue, by: str) -> None:
             number = parse_lesson(lesson)
             day = date.fromisoformat(recorded) if recorded.strip() else None
-            name = ensure_group(group, _state(request).config(), by)  # a new group only now
+            cfg = _state(request).config()
+            # A new group goes into groups.toml only for an account that publishes (T-1013).
+            if user.publishes:
+                name = ensure_group(group, cfg, by)
+            else:
+                name = parse_group(group, cfg.groups)
             queue.identify(job_id, by, group=name, lesson=number, recording_date=day,
                            note=note.strip())  # fmt: skip
 
@@ -501,7 +570,7 @@ def create_app(
 
     @app.post("/recordings/{job_id}/rerun")
     def rerun(
-        request: Request, job_id: int, user: Annotated[Staff, Depends(staff)],
+        request: Request, job_id: int, user: Annotated[Staff, Depends(admin)],
         stage: Annotated[str, Form()] = "", note: Note = "",
     ) -> Response:  # fmt: skip
         def operation(queue: JobQueue, by: str) -> None:
@@ -511,6 +580,7 @@ def create_app(
 
     @app.post("/recordings/{job_id}/retry")
     def retry(request: Request, job_id: int, user: Annotated[Staff, Depends(staff)]) -> Response:
+        reachable(request, job_id, user)
         return act(request, job_id, user, "retried", lambda queue, by: queue.retry_now(job_id, by))
 
     def summary(request: Request, days: int) -> metrics.Summary:
@@ -525,7 +595,7 @@ def create_app(
 
     @app.get("/metrics", response_class=HTMLResponse)
     def metrics_page(
-        request: Request, user: Annotated[Staff, Depends(staff)], days: int = 30
+        request: Request, user: Annotated[Staff, Depends(admin)], days: int = 30
     ) -> Response:
         """The PRD success metrics and the compute "cost" (T-805)."""
         found = summary(request, days)
@@ -545,11 +615,12 @@ def create_app(
 
     @app.get("/metrics.json")
     def metrics_json(
-        request: Request, user: Annotated[Staff, Depends(staff)], days: int = 30
+        request: Request, user: Annotated[Staff, Depends(admin)], days: int = 30
     ) -> Response:
         return JSONResponse(summary(request, days).to_dict())
 
     uploads.install(app, staff=staff, render=render, state=_state)
+    accounts.install(app, staff=staff, admin=admin, render=render, state=_state, account=Staff.of)
     api.install(app, state=_state)
 
     return app

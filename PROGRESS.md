@@ -6,9 +6,9 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 54 of 56 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 55 of 57 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1012 — Unclear speech waits for staff (D-064, 2026-11-21 15:43) |
+| **Last completed task** | T-1013 — Accounts: registration, users, admin pages (D-065, 2026-11-21 17:08) |
 | **Current task** | — (the user brings a new lesson video to check the terms) |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
@@ -207,6 +207,34 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 17:08 — T-1013 Accounts: registration, users and the admin (user request, D-065) — DONE
+
+The user: people with videos to process sign in; without an account they register (first and
+last name, email, optional phone); the admin sees the users and what they do and can close an
+account. Answers: a new account works at once, but its videos are not published (the user
+downloads the processed one); a user sees only their own recordings and decides on them except
+consent. Added mid-task: the admin can let chosen users publish to YouTube.
+
+- **Schema version 2** (`db/versioning.py`): `staff_users` role, can_publish, first/last name,
+  email (unique), phone; `recordings` uploaded_by_id, publish. Existing accounts become admins;
+  existing uploads are linked to their accounts. Test from the real v1 schema
+  (`tests/unit/schema_v1.sql`).
+- **Web:** `/register` (email = username, 5 accounts an hour per address, signed in at once);
+  `/admin/users` and `/admin/users/<id>` (recordings, last 50 actions with notes, close/open,
+  allow/stop publishing); a user sees and opens only their own recordings and uploads (else
+  404); release, rerun, metrics and accounts are admin-only (403); nav shows the admin links
+  only to admins. `reel user add --admin`; `reel user list` shows the role.
+- **Pipeline:** `publish = false` → Consent, Upload and Post do nothing ("only processed");
+  Chapters needs no group in groups.toml, and a user's typed group is not added there; the
+  page offers the download and hides publications; unclear speech asks to "finish".
+- **Real database upgraded** 17:06 (backup `data/backups/reel-v1-20261121T130642Z.db`):
+  `admin` is admin; recordings 1-3 linked to it. `reel serve` restarted with the new code.
+- `tools/public-test` (Codex's external test) still runs the old code; its own database is
+  version 1, so it needs `reel db upgrade` before it restarts (not touched: the user's call).
+- 24 tests in `tests/unit/test_accounts.py`, `tests/integration/test_processed_only.py`, 2 in
+  `test_chapters_stage.py`, the migration test; versioning tests made version-relative.
+  Full suite: 1364 passed (-W error), ruff clean.
 
 ### 2026-11-21 15:43 — T-1012 Unclear speech waits for staff (user request, D-064) — DONE
 

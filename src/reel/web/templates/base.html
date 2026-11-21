@@ -15,7 +15,10 @@
     <nav class="menu">
       <a class="nav-link{% if request.url.path == '/' or request.url.path.startswith('/recordings/') %} is-active{% endif %}" href="/">Ձայնագրություններ</a>
       <a class="nav-link{% if request.url.path == '/upload' %} is-active{% endif %}" href="/upload">Վերբեռնել</a>
+      {% if user.is_admin %}
       <a class="nav-link{% if request.url.path == '/metrics' %} is-active{% endif %}" href="/metrics">Չափումներ</a>
+      <a class="nav-link{% if request.url.path.startswith('/admin/users') %} is-active{% endif %}" href="/admin/users">Օգտատերեր</a>
+      {% endif %}
     </nav>
     <form class="logout" method="post" action="/logout">
       <input type="hidden" name="csrf_token" value="{{ csrf }}">

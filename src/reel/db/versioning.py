@@ -26,7 +26,7 @@ from reel.db.base import Base, utcnow
 from reel.db.engine import DEFAULT_BUSY_TIMEOUT, Database, DatabaseError
 from reel.db.models import AppMeta, SchemaVersion
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 VERSION_TABLE = SchemaVersion.__tablename__
 
 
@@ -43,8 +43,35 @@ class Migration:
     apply: Callable[[Connection], None]
 
 
-# Version 1 is the initial schema, so there are no migrations yet.
-MIGRATIONS: tuple[Migration, ...] = ()
+def _accounts_and_owners(connection: Connection) -> None:
+    """Version 2 (T-1013): roles and contact details of the accounts; who uploaded a
+    recording and whether it is published. The accounts so far were all staff with every
+    right, so they become admins; uploads made so far are linked to their accounts."""
+    for statement in (
+        "ALTER TABLE staff_users ADD COLUMN role VARCHAR(16) DEFAULT 'user' NOT NULL",
+        "ALTER TABLE staff_users ADD COLUMN can_publish BOOLEAN DEFAULT 0 NOT NULL",
+        "ALTER TABLE staff_users ADD COLUMN first_name VARCHAR(100)",
+        "ALTER TABLE staff_users ADD COLUMN last_name VARCHAR(100)",
+        "ALTER TABLE staff_users ADD COLUMN email VARCHAR(254)",
+        "ALTER TABLE staff_users ADD COLUMN phone VARCHAR(32)",
+        "UPDATE staff_users SET role = 'admin'",
+        "CREATE UNIQUE INDEX ix_staff_users_email ON staff_users (email)",
+        "ALTER TABLE recordings ADD COLUMN uploaded_by_id INTEGER "
+        "REFERENCES staff_users (id) ON DELETE SET NULL",
+        "ALTER TABLE recordings ADD COLUMN publish BOOLEAN DEFAULT 1 NOT NULL",
+        "CREATE INDEX ix_recordings_uploaded_by_id ON recordings (uploaded_by_id)",
+        "UPDATE recordings SET uploaded_by_id = (SELECT staff_users.id FROM staff_users "
+        "WHERE staff_users.username = json_extract(recordings.identification, '$.staff.by')) "
+        "WHERE json_extract(recordings.identification, '$.staff.source') = 'upload'",
+    ):
+        connection.exec_driver_sql(statement)
+
+
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration(
+        2, "accounts: roles, contact details; recordings: uploader, publish", _accounts_and_owners
+    ),
+)
 
 
 class SchemaState(StrEnum):

@@ -161,6 +161,10 @@ class UploadStore:
                  len(entries), total)  # fmt: skip
         return self.status(upload_id)
 
+    def owner(self, upload_id: str) -> str:
+        """The username that started the upload (T-1013)."""
+        return str(self._read(upload_id).get("created_by", ""))
+
     def status(self, upload_id: str) -> dict[str, Any]:
         meta = self._read(upload_id)
         folder = self._dir(upload_id)
@@ -221,9 +225,13 @@ class UploadStore:
         shutil.rmtree(self._dir(upload_id))
         log.info("upload %s cancelled", upload_id)
 
-    def finish(self, upload_id: str, session_factory: Callable[[], Any], by: str) -> int:
+    def finish(
+        self, upload_id: str, session_factory: Callable[[], Any], by: str, *,
+        owner_id: int | None = None, publish: bool = True,
+    ) -> int:  # fmt: skip
         """Check every file is complete, move them into ``data/recordings/<id>/`` and create
-        the recording and its job. Returns the job id."""
+        the recording and its job. Returns the job id. ``owner_id``: the account that
+        uploaded it; ``publish=False``: the recording is only processed (T-1013)."""
         lock = self._lock(upload_id)
         if not lock.acquire(blocking=False):
             raise UploadError("Այս վերբեռնումն արդեն գրվում է մեկ այլ հարցմամբ։", 409)
@@ -248,7 +256,9 @@ class UploadStore:
             os.replace(source, target)
             try:
                 with session_factory() as session:
-                    job_id = create_lesson(session, meta, target, by)
+                    job_id = create_lesson(
+                        session, meta, target, by, owner_id=owner_id, publish=publish
+                    )
             except Exception:
                 os.replace(target, source)  # the upload stays, and can be finished again
                 meta["finished"] = False
@@ -260,7 +270,10 @@ class UploadStore:
         return job_id
 
 
-def create_lesson(session: Session, meta: dict[str, Any], folder: Path, by: str) -> int:
+def create_lesson(
+    session: Session, meta: dict[str, Any], folder: Path, by: str, *,
+    owner_id: int | None = None, publish: bool = True,
+) -> int:  # fmt: skip
     """One recording and one job for the uploaded files (D-035): one file is a recording like
     a watched one; several files are its parts, in order (``media_info["parts"]``)."""
     from reel.queue import create_job
@@ -275,6 +288,8 @@ def create_lesson(session: Session, meta: dict[str, Any], folder: Path, by: str)
         source_path=str(paths[0].resolve()),
         size_bytes=sum(entry["size"] for entry in files),
         file_modified_at=modified,
+        uploaded_by_id=owner_id,
+        publish=publish,
         group_name=meta["group"],
         lesson_number=meta["lesson"],
         recording_date=date.fromisoformat(meta["date"]) if meta["date"] else None,

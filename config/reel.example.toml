@@ -232,6 +232,8 @@ session_hours = 12.0
 upload_max_gb = 20.0                       # largest file staff can upload in the dashboard
 tls = false                                # true = HTTPS with the certificate from `reel cert`;
                                            # needs an https:// base_url (docs/setup/network.md)
+registration = true                        # anyone may make an account; its uploads are only
+                                           # processed until the admin lets it publish (T-1013)
 
 [schedule]
 timezone = "Asia/Yerevan"

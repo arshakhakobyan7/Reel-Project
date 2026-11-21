@@ -29,6 +29,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
@@ -53,6 +55,7 @@ _USERNAME = re.compile(r"[\w.@+-]{2,64}")
 # idempotency tags on YouTube/Slack) uses AUTOINCREMENT, so SQLite never reuses an id
 # after a row is deleted.
 _NO_ID_REUSE = {"sqlite_autoincrement": True}
+ROLE_ADMIN, ROLE_USER = "admin", "user"  # T-1013
 
 
 def _created() -> Mapped[datetime]:
@@ -143,6 +146,12 @@ class Recording(Base):
     duplicate_of_id: Mapped[int | None] = mapped_column(
         ForeignKey("recordings.id", ondelete="SET NULL")
     )
+    # T-1013: the account that uploaded it in the dashboard (None: a watched folder), and
+    # whether it is published (YouTube, Slack, Classroom, Library) or only processed.
+    uploaded_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("staff_users.id", ondelete="SET NULL"), index=True
+    )
+    publish: Mapped[bool] = mapped_column(default=True, server_default=true())
     group_name: Mapped[str | None] = mapped_column(String(200))
     lesson_number: Mapped[int | None]
     recording_date: Mapped[date | None]
@@ -488,21 +497,41 @@ class LibraryEntry(Base):
 
 
 class StaffUser(Base):
-    """Dashboard login (T-802). Usernames are stored in canonical form."""
+    """Dashboard login (T-802). Usernames are stored in canonical form.
+
+    T-1013: an ``admin`` sees every recording and manages the accounts; a ``user`` (who
+    registered in the dashboard) sees only their own uploads. A user's uploads are only
+    processed, unless the admin allowed them to publish (``can_publish``)."""
 
     __tablename__ = "staff_users"
+    __table_args__ = (Index("ix_staff_users_email", "email", unique=True),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True)
     display_name: Mapped[str | None] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String(512))
     is_active: Mapped[bool] = mapped_column(default=True)
+    role: Mapped[str] = mapped_column(String(16), default=ROLE_USER, server_default=ROLE_USER)
+    can_publish: Mapped[bool] = mapped_column(default=False, server_default=false())
+    first_name: Mapped[str | None] = mapped_column(String(100))
+    last_name: Mapped[str | None] = mapped_column(String(100))
+    email: Mapped[str | None] = mapped_column(String(254))
+    phone: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = _created()
     updated_at: Mapped[datetime] = _updated()
     last_login_at: Mapped[datetime | None]
 
     def __repr__(self) -> str:  # never shows the password hash
         return f"<StaffUser id={self.id} username={self.username!r}>"
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == ROLE_ADMIN
+
+    @property
+    def publishes(self) -> bool:
+        """Whether this account's uploads are published, not only processed."""
+        return self.is_admin or self.can_publish
 
     @validates("username")
     def _normalize(self, _key: str, value: str) -> str:

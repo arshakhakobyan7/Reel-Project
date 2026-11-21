@@ -30,7 +30,7 @@ The PRD lists `Cleaned` before `Transcribed`. Here the transcript is made first,
 | 7 | Publishing: YouTube, Slack, Classroom, Academy Library | T-701 … T-706 |
 | 8 | Operations: notifications, dashboard, metrics, integration API | T-801 … T-806 |
 | 9 | Runtime, recovery, retention, packaging | T-901 … T-903 |
-| 10 | End-to-end verification and documentation | T-1001 … T-1012 |
+| 10 | End-to-end verification and documentation | T-1001 … T-1013 |
 
 ## Task summary
 
@@ -92,6 +92,7 @@ The PRD lists `Cleaned` before `Transcribed`. Here the transcript is made first,
 | T-1010 | English programming terms stay English in the transcript (Latin letters, right spelling): term fixer after Whisper (user request, D-062) | Must | T-302 | DONE |
 | T-1011 | Board framing on a light wall: the board's frame lines; legs under a desk left out (user request, D-063) | Must | T-1006 | DONE |
 | T-1012 | Unclear speech: hold for staff; publish as it is, with staff chapters, or cancel (user request, D-064) | Must | T-504, T-804 | DONE |
+| T-1013 | Accounts: registration, users see their own uploads (only processed unless allowed to publish), admin account pages (user request, D-065) | Must | T-802, T-807 | DONE |
 
 ---
 

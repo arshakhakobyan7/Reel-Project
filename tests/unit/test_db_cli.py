@@ -5,7 +5,7 @@ from pathlib import Path
 from reel.cli import main
 from reel.config import load_config
 from reel.config.check import CheckItem, run_checks
-from reel.db import init_database
+from reel.db import SCHEMA_VERSION, init_database
 from reel.media.ffmpeg_check import CapabilityReport
 
 
@@ -20,11 +20,14 @@ def test_init_status_and_upgrade(project, capsys):
     assert not path.exists()
 
     assert main(db_args(project, "init")) == 0
-    assert f"Created database {path} (schema version 1)." in capsys.readouterr().out
+    assert f"Created database {path} (schema version {SCHEMA_VERSION})." in capsys.readouterr().out
     assert path.is_file()
 
     assert main(db_args(project, "init")) == 0
-    assert "already exists (schema version 1); nothing to do." in capsys.readouterr().out
+    assert (
+        f"already exists (schema version {SCHEMA_VERSION}); nothing to do."
+        in capsys.readouterr().out
+    )
 
     assert main(db_args(project, "status")) == 0
     out = capsys.readouterr().out
@@ -34,7 +37,7 @@ def test_init_status_and_upgrade(project, capsys):
     assert "  jobs                 0" in out
 
     assert main(db_args(project, "upgrade")) == 0
-    assert "already at schema version 1" in capsys.readouterr().out
+    assert f"already at schema version {SCHEMA_VERSION}" in capsys.readouterr().out
     assert not (project / "data" / "backups").exists()
 
 
@@ -77,7 +80,9 @@ def test_config_check_reports_the_database(project):
         CheckItem("warn", f"database {shown} does not exist yet: run `reel db init`")
     ]
     init_database(cfg.paths.database_file)
-    assert database_items() == [CheckItem("ok", f"database {shown}: schema version 1")]
+    assert database_items() == [
+        CheckItem("ok", f"database {shown}: schema version {SCHEMA_VERSION}")
+    ]
     cfg.paths.database_file.unlink()
     cfg.paths.database_file.write_text("garbage " * 100)
     (item,) = database_items()

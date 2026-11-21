@@ -25,6 +25,8 @@
     <dt>Ամսաթիվ</dt><dd>{{ d.date or "—" }}</dd>
     <dt>Տևողություն</dt><dd>{{ d.original or "—" }}{% if d.final %} → {{ d.final }}{% endif %}</dd>
     <dt>Ավելացվել է</dt><dd>{{ d.created }}</dd>
+    {% if user.is_admin and d.uploader %}<dt>Վերբեռնել է</dt><dd>{{ d.uploader }}</dd>{% endif %}
+    {% if not d.publish %}<dt>YouTube</dt><dd>Միայն մշակում. տեսանյութը չի տեղադրվում YouTube-ում</dd>{% endif %}
   </dl>
 </section>
 
@@ -33,30 +35,32 @@
   <h2>Տեսանյութ</h2>
   <video class="player" controls preload="metadata" src="/recordings/{{ d.job_id }}/video"{% if d.metadata and d.metadata.has_thumbnail %} poster="/recordings/{{ d.job_id }}/thumbnail"{% endif %}></video>
   <p class="small"><a href="/recordings/{{ d.job_id }}/video?download=1" download>Ներբեռնել (MP4)</a>
-    {% if not on_youtube %}· <span class="muted">Տեսանյութը YouTube-ում չէ. այն միայն այս համակարգչում է և ավտոմատ չի ջնջվի։</span>{% endif %}</p>
+    {% if not d.publish %}· <span class="muted">Սա մշակված տեսանյութն է. ներբեռնեք այն։ Այն YouTube-ում չի տեղադրվում։</span>
+    {% elif not on_youtube %}· <span class="muted">Տեսանյութը YouTube-ում չէ. այն միայն այս համակարգչում է և ավտոմատ չի ջնջվի։</span>{% endif %}</p>
 </section>
 {% endif %}
 
 <section class="card actions">
   <h2>Գործողություններ</h2>
   {% if d.status.value == "on_hold" and d.hold_reason == speech_unclear %}
-  <p>Տեսանյութում խոսքը պարզ չէ, ուստի բաժիններ չգտնվեցին։ Դիտեք տեսանյութը և որոշեք՝ տեղադրել այն, թե չեղարկել (ներքևում)։</p>
+  {% set go = "Տեղադրել" if d.publish else "Ավարտել" %}
+  <p>Տեսանյութում խոսքը պարզ չէ, ուստի բաժիններ չգտնվեցին։ Դիտեք տեսանյութը և որոշեք՝ {{ "տեղադրել այն" if d.publish else "ավարտել մշակումը" }}, թե չեղարկել (ներքևում)։</p>
   <form method="post" action="/recordings/{{ d.job_id }}/publish">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
-    <h3>Տեղադրել առանց բաժինների</h3>
+    <h3>{{ go }} առանց բաժինների</h3>
     <label for="publish-note">Նշում (ըստ ցանկության)</label>
     <input id="publish-note" name="note" maxlength="1000">
-    <button type="submit">Տեղադրել առանց բաժինների</button>
+    <button type="submit">{{ go }} առանց բաժինների</button>
   </form>
   <form method="post" action="/recordings/{{ d.job_id }}/chapters">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
-    <h3>Տեղադրել իմ նշած բաժիններով</h3>
+    <h3>{{ go }} իմ նշած բաժիններով</h3>
     <p class="muted small">Ամեն տողում մեկ բաժին՝ սկզբի ժամանակը վերևի տեսանյութում և անունը։ Առաջինը սկսվում է 0:00-ից, պետք է լինի առնվազն {{ chapter_rules[0] }} բաժին, յուրաքանչյուրը՝ առնվազն {{ "%g"|format(chapter_rules[1]) }} վայրկյան։</p>
     <label for="staff-chapters">Բաժիններ</label>
     <textarea id="staff-chapters" name="chapters" rows="6" maxlength="20000" required placeholder="0:00 Ներածություն&#10;4:30 Ֆունկցիաներ&#10;12:05 Օրինակներ">{{ chapters_text }}</textarea>
-    <button type="submit">Պահպանել բաժինները և տեղադրել</button>
+    <button type="submit">Պահպանել բաժինները և {{ go | lower }}</button>
   </form>
-  {% elif d.can_release %}
+  {% elif d.can_release and user.is_admin %}
   <form method="post" action="/recordings/{{ d.job_id }}/release">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
     <label for="release-note">Նշում (ըստ ցանկության)</label>
@@ -85,7 +89,7 @@
   </form>
   {% endif %}
 
-  {% if d.can_rerun %}
+  {% if d.can_rerun and user.is_admin %}
   <form method="post" action="/recordings/{{ d.job_id }}/rerun">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
     <h3>Վերագործարկել</h3>
@@ -149,6 +153,7 @@
 </section>
 {% endif %}
 
+{% if d.publish %}
 <section class="card table table-panel">
   <h2>Հրապարակում</h2>
   <table>
@@ -166,6 +171,8 @@
     </tbody>
   </table>
 </section>
+
+{% endif %}
 
 {% if d.consent %}
 <section class="card table table-panel">

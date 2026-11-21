@@ -52,7 +52,7 @@ def site(project, write_config):
     init_database(cfg.paths.database_file)
     db = open_database(cfg.paths.database_file)
     with db.transaction() as s:
-        s.add(StaffUser(username="anna", password_hash=hash_password(PASSWORD)))
+        s.add(StaffUser(username="anna", password_hash=hash_password(PASSWORD), role="admin"))
     app = create_app(db, lambda: cfg, SECRET, throttle=LoginThrottle())
     with TestClient(app, follow_redirects=False) as client:
         token = TOKEN.search(client.get("/login").text)[1]

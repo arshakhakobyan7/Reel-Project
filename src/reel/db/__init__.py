@@ -28,6 +28,8 @@ from reel.db.enums import (
     next_stage,
 )
 from reel.db.models import (
+    ROLE_ADMIN,
+    ROLE_USER,
     AppMeta,
     ConsentCheck,
     CutList,
@@ -60,6 +62,8 @@ from reel.db.versioning import (
 )
 
 __all__ = [
+    "ROLE_ADMIN",
+    "ROLE_USER",
     "DEFAULT_BUSY_TIMEOUT",
     "MIGRATIONS",
     "PIPELINE",

@@ -60,6 +60,8 @@ from reel.queue.stage import (
     StageFailed,
     StageHandler,
     StageResult,
+    only_processed,
+    skipped_unpublished,
 )
 from reel.stages.cleaning import CLEANED_FILE
 
@@ -378,6 +380,8 @@ class UploadStage(StageHandler):
         self.tokens_factory = tokens_factory
 
     def run(self, ctx: StageContext) -> StageResult:
+        if only_processed(ctx):
+            return skipped_unpublished()
         lesson = load_lesson(ctx)
         settings = ctx.config.settings.youtube
         video = ctx.job_dir / CLEANED_FILE
@@ -464,6 +468,8 @@ class PostStage(StageHandler):
         self.tokens_factory = tokens_factory
 
     def run(self, ctx: StageContext) -> StageResult:
+        if only_processed(ctx):
+            return skipped_unpublished()
         lesson = load_lesson(ctx)
         video = read_record(ctx.db, ctx.job_id, TargetKind.YOUTUBE)
         if video.status is not PublicationStatus.PUBLISHED:

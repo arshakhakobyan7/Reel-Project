@@ -10,6 +10,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from reel.db import (
     PIPELINE,
+    SCHEMA_VERSION,
     ActorKind,
     AppMeta,
     ConsentCheck,
@@ -574,7 +575,7 @@ def test_stage_order_and_names():
 def test_bookkeeping_tables(db):
     with db.transaction() as s:
         (version,) = s.scalars(select(SchemaVersion)).all()
-        assert version.version == 1 and version.description == "initial schema"
+        assert version.version == SCHEMA_VERSION and version.description == "initial schema"
         meta = {row.key: row.value for row in s.scalars(select(AppMeta))}
         assert set(meta) == {"instance_id", "created_at"}
         assert len(meta["instance_id"]) == 32

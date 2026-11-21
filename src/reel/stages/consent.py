@@ -20,7 +20,15 @@ from reel.config.loader import LoadedConfig
 from reel.consent import ConsentProvider, make_consent_provider
 from reel.db import ConsentCheck, Job, Stage
 from reel.db.enums import ConsentResult
-from reel.queue.stage import Hold, StageContext, StageFailed, StageHandler, StageResult
+from reel.queue.stage import (
+    Hold,
+    StageContext,
+    StageFailed,
+    StageHandler,
+    StageResult,
+    only_processed,
+    skipped_unpublished,
+)
 
 HOLD_PREFIX = "consent_"
 MESSAGES = {
@@ -48,6 +56,8 @@ class ConsentStage(StageHandler):
 
     def run(self, ctx: StageContext) -> StageResult:
         cfg = ctx.config
+        if only_processed(ctx):  # nothing is published, so there is nothing to consent to
+            return skipped_unpublished()
         with ctx.db.transaction() as session:
             recording = session.get(Job, ctx.job_id).recording
             group_name, lesson_date = recording.group_name, recording.recording_date

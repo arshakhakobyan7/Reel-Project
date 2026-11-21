@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ u.name }}{% endblock %}
+{% block content %}
+<p><a href="/admin/users">← Օգտատերեր</a></p>
+<h1>{{ u.name }}</h1>
+<p class="muted small">#{{ u.id }} · {{ u.username }}</p>
+
+{% if message %}<p class="notice" role="status">{{ message }}</p>{% endif %}
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <p>
+    {% if u.active %}<span class="badge status-done">Ակտիվ</span>{% else %}<span class="badge status-cancelled">Փակված</span>{% endif %}
+    <span class="badge">{{ u.role }}</span>
+    {% if u.publishes %}<span class="badge status-running">Տեղադրում է YouTube-ում</span>{% else %}<span class="badge">Միայն մշակում</span>{% endif %}
+  </p>
+  <dl class="facts">
+    <dt>Անուն</dt><dd>{{ u.first_name or "—" }}</dd>
+    <dt>Ազգանուն</dt><dd>{{ u.last_name or "—" }}</dd>
+    <dt>Email</dt><dd>{{ u.email or "—" }}</dd>
+    <dt>Հեռախոս</dt><dd>{{ u.phone or "—" }}</dd>
+    <dt>Գրանցվել է</dt><dd>{{ u.created }}</dd>
+    <dt>Վերջին մուտք</dt><dd>{{ u.last_login or "—" }}</dd>
+    <dt>Ձայնագրություններ</dt><dd>{{ u.total }} (ընթացքում՝ {{ u.working }}, պատրաստ՝ {{ u.done }}, ձախողված՝ {{ u.failed }})</dd>
+  </dl>
+</section>
+
+<section class="card actions">
+  <h2>Կառավարում</h2>
+  {% if not u.is_admin %}
+  <form method="post" action="/admin/users/{{ u.id }}/publish">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <h3>YouTube</h3>
+    {% if u.can_publish %}
+    <p class="muted small">Այս օգտատիրոջ տեսանյութերը տեղադրվում են YouTube-ում (համաձայնության ստուգումից հետո)։</p>
+    <button type="submit" name="allow" value="0" class="secondary">Արգելել տեղադրումը (միայն մշակում)</button>
+    {% else %}
+    <p class="muted small">Այս օգտատիրոջ տեսանյութերը միայն մշակվում են. նա դրանք ներբեռնում է։ Թույլ տալուց հետո նրա նոր տեսանյութերը կտեղադրվեն YouTube-ում։</p>
+    <button type="submit" name="allow" value="1">Թույլ տալ տեղադրել YouTube-ում</button>
+    {% endif %}
+  </form>
+  {% endif %}
+  <form method="post" action="/admin/users/{{ u.id }}/active"{% if u.active %} class="danger"{% endif %}>
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    {% if u.active %}
+    <h3>Փակել հաշիվը</h3>
+    <p class="muted small">Օգտատերն այլևս չի կարողանա մուտք գործել, իսկ նրա բաց session-ները կփակվեն անմիջապես։ Ձայնագրությունները կմնան։ Հաշիվը հետո կարելի է նորից բացել։</p>
+    <button type="submit" name="active" value="0" class="danger">Փակել հաշիվը</button>
+    {% else %}
+    <h3>Բացել հաշիվը</h3>
+    <button type="submit" name="active" value="1">Բացել հաշիվը</button>
+    {% endif %}
+  </form>
+</section>
+
+<section class="card table table-panel">
+  <h2>Ձայնագրություններ</h2>
+  {% if recordings %}
+  <table>
+    <thead><tr><th>#</th><th>Ձայնագրություն</th><th>Վիճակ</th><th>Տևողություն</th><th>Ավելացվել է</th><th>YouTube</th></tr></thead>
+    <tbody>
+      {% for r in recordings %}
+      <tr>
+        <td>{{ r.job_id }}</td>
+        <td><a href="/recordings/{{ r.job_id }}">{{ r.title }}</a></td>
+        <td><span class="badge status-{{ r.status }}">{{ r.status_label }}</span></td>
+        <td>{{ r.duration or "—" }}</td>
+        <td class="nowrap">{{ r.created }}</td>
+        <td>{% if r.publish %}Այո{% else %}<span class="muted">Ոչ (միայն մշակում)</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">Այս օգտատերը դեռ ոչինչ չի վերբեռնել։</p>{% endif %}
+</section>
+
+<section class="card table table-panel">
+  <h2>Վերջին գործողությունները</h2>
+  {% if actions %}
+  <table>
+    <thead><tr><th>Երբ</th><th>Ձայնագրություն</th><th>Ինչ</th><th>Մանրամասներ</th></tr></thead>
+    <tbody>
+      {% for a in actions %}
+      <tr>
+        <td class="nowrap">{{ a.at }}</td>
+        <td><a href="/recordings/{{ a.job_id }}">#{{ a.job_id }}</a></td>
+        <td>{{ a.kind }}{% if a.stage %}<div class="muted small">{{ a.stage }}</div>{% endif %}</td>
+        <td class="small">{{ a.message }}{% if a.note %}<div>Նշում՝ {{ a.note }}</div>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">Գործողություններ դեռ չկան։</p>{% endif %}
+</section>
+{% endblock %}

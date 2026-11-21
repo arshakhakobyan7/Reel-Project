@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from reel.config.loader import LoadedConfig
-from reel.db import PIPELINE, Database, Stage
+from reel.db import PIPELINE, Database, Job, Stage
 from reel.queue.jobs import Claim
 
 log = logging.getLogger("reel.worker")
@@ -60,12 +60,25 @@ class StageCancelled(Exception):
     """Raised by ``ctx.check()`` when the stage must stop; the reason says why."""
 
 
+NOT_PUBLISHED = "only processed: a user's upload is not published (T-1013)"
+
+
 @dataclass(frozen=True)
 class StageResult:
     """Optional return value of ``run``: metrics for the StageRun and a short message."""
 
     metrics: dict[str, Any] = field(default_factory=dict)
     message: str = ""
+
+
+def only_processed(ctx: StageContext) -> bool:
+    """A user's upload that is not published: consent, upload and post do nothing (T-1013)."""
+    with ctx.db.transaction() as session:
+        return not session.get(Job, ctx.job_id).recording.publish
+
+
+def skipped_unpublished() -> StageResult:
+    return StageResult(metrics={"skipped": "not published"}, message=NOT_PUBLISHED)
 
 
 class StageContext:

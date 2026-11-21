@@ -182,7 +182,11 @@ def test_the_metrics_page_and_json(project, write_config):
     with db:
         ids = seed(db)
         with db.transaction() as s:
-            s.add(StaffUser(username="anna", password_hash=hash_password("metrics-password")))
+            s.add(
+                StaffUser(
+                    username="anna", password_hash=hash_password("metrics-password"), role="admin"
+                )
+            )
         app = create_app(db, lambda: cfg, "metrics-secret-" + "m" * 30, throttle=LoginThrottle())
         with TestClient(app, follow_redirects=False) as client:
             assert client.get("/metrics").status_code == 303  # login first

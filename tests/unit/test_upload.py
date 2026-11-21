@@ -122,7 +122,11 @@ def site(project, write_config):
     init_database(cfg.paths.database_file)
     db = open_database(cfg.paths.database_file)
     with db.transaction() as s:
-        s.add(StaffUser(username="anna", password_hash=hash_password("upload-password-1")))
+        s.add(
+            StaffUser(
+                username="anna", password_hash=hash_password("upload-password-1"), role="admin"
+            )
+        )
     app = create_app(db, lambda: cfg, "upload-secret-" + "u" * 30, throttle=LoginThrottle())
     with TestClient(app, follow_redirects=False) as client:
         token = TOKEN.search(client.get("/login").text)[1]
