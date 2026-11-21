@@ -73,6 +73,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-066 | A user's processed video and uploaded files are deleted 30 days after the job ended; the page tells the date | user | Accepted |
 | D-067 | Duplicates per account: a video only processed is compared only with the same account's videos in progress or ready | user | Accepted |
 | D-068 | "My page": every account updates its own details and password; the username never changes; sign-in by username or email; users see no cost panel | user + agent | Accepted |
+| D-069 | The live server runs a reviewed commit from its own folder (`ReelProject-live`), not the files being edited | agent (after an outage) | Accepted |
 
 ---
 
@@ -770,3 +771,25 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
   - **The cost panel.** «Ծախս և ժամանակ» on the recording page is shown only to the admin. `/metrics` is already admin-only.
   - The work is given to GPT (`handoff/T-1016.md`, D-031). Claude reviews it and runs the full suite before it counts as done.
 - **Not in this task:** the admin setting another account's password on the web (`reel user password` does it); an email check (D-065).
+
+### D-069 — The live server runs a reviewed commit from its own folder
+- **Date:** 2026-11-21 · **Source:** the agent, after an outage the user reported · **Status:** Accepted
+- **What happened:**
+  - From 18:17 every dashboard page answered 500.
+  - GPT was working on T-1016 in `ReelProject` and changed `base.html` to use the new `texts.PROFILE_LABELS`.
+  - The running server reads templates from disk, but loaded `texts.py` when it started, so the new template met the old code.
+  - Nothing was lost. Job 7 finished normally at 18:20.
+- **Decision:**
+  - The live `reel serve` runs the code of a reviewed commit, from a git worktree: `C:\Users\User\Desktop\ReelProject-live` (detached at that commit).
+  - It starts with `PYTHONPATH=<ReelProject-live>\src` and the working directory `ReelProject`. So the data, configuration, logs, tools and certificates are the real ones, and only the code and templates come from the worktree.
+  - Edits in `ReelProject` (Claude's or GPT's) never reach the live server until Claude reviews them, commits them and moves the worktree:
+    ```powershell
+    git -C C:\Users\User\Desktop\ReelProject-live checkout --detach <commit>
+    # check no job runs, then restart:
+    $env:PYTHONPATH = "C:\Users\User\Desktop\ReelProject-live\src"
+    Start-Process .venv\Scripts\pythonw.exe -ArgumentList '-m','reel','serve','--host','127.0.0.1' -WorkingDirectory C:\Users\User\Desktop\ReelProject -WindowStyle Hidden
+    ```
+  - A schema upgrade (`reel db upgrade`) is run with the same `PYTHONPATH`, so that the database matches the code that serves it.
+- **Rejected:**
+  - Restarting on the folder being edited: it would have loaded GPT's unfinished, unreviewed code.
+  - Undoing GPT's changes: they are its task in progress.

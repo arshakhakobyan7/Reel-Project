@@ -208,6 +208,27 @@ ruff clean) and what was run on this PC.
 
 ## Log (newest first)
 
+### 2026-11-21 18:25 — Dashboard outage (500 from 18:17); the live server now runs from `ReelProject-live` (D-069)
+
+- **The user:** "my server does not start: is it GPT's work?"
+  - The server ran, but every signed-in page answered 500:
+    `UndefinedError: 'module object' has no attribute 'PROFILE_LABELS'`.
+  - GPT, working on T-1016 in this folder, had changed `base.html`. The running server
+    reloads templates from disk but had loaded the older `texts.py` when it started.
+- **Fix:**
+  - `git worktree add --detach ../ReelProject-live afb0d27`.
+  - `reel serve` restarted 18:23 with `PYTHONPATH=<ReelProject-live>\src`, working directory
+    `ReelProject` (real data, config, logs).
+  - Checked first that no job was running or held and no upload was open.
+  - Checked: `reel` is imported from the worktree, and `/login` and `/register` answer 200.
+    The anonymous `/` redirects to login. Dashboard, detail, accounts and auth tests on the
+    worktree code: 78 passed.
+- GPT's unfinished T-1016 changes in `ReelProject` were left untouched. No report from GPT yet.
+- **Job 7** (the user's re-upload of `IMG_0359_first15min.MOV`, only processed): Done at
+  18:20. Steps: Clean 613 s (zoom 1.12x, 12 s cut), Chapters 3, then Consent, Upload and Post
+  skipped.
+- `handoff/README.md` now tells GPT never to touch `ReelProject-live`.
+
 ### 2026-11-21 18:12 — T-1016 "My page" handed to GPT (user request, D-068)
 
 - **The user:**

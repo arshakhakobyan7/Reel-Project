@@ -17,6 +17,7 @@ You get one task at a time from a file `handoff/T-xxx.md`. Claude reviews your w
    your report; Claude applies it.
 2. **Never open or read** `samples/` (private lesson recordings), `.env`, `data/`, `logs/`,
    `config/reel.toml`, `config/groups.toml`, `config/consent.json`. The `*.example.*` files are fine.
+   **Never touch `C:\Users\User\Desktop\ReelProject-live`**: the live server runs from it (D-069).
 3. **Free software only (D-009).** No new dependencies; use the standard library
    (`urllib.request`, `http.server`, `json`, `threading`, ...). If one is truly needed, stop and ask
    in the report.
