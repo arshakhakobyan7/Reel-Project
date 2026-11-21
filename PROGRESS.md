@@ -6,9 +6,9 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 53 of 55 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 54 of 56 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1011 — Board framing on a light wall (D-063, 2026-11-21 15:21) |
+| **Last completed task** | T-1012 — Unclear speech waits for staff (D-064, 2026-11-21 15:43) |
 | **Current task** | — (the user brings a new lesson video to check the terms) |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
@@ -207,6 +207,26 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 15:43 — T-1012 Unclear speech waits for staff (user request, D-064) — DONE
+
+The user: tell staff that the speech is not clear and that no chapters could be found; staff
+decide to publish or cancel; when publishing, they may set the chapters themselves.
+
+- `stages/chapters.py`: no chapters and fewer than `[metadata] min_words_per_minute` (20)
+  words per minute → title, description and thumbnail are stored, then hold `speech_unclear`
+  with an Armenian message (word count, minutes). `set_staff_chapters` stores staff chapters
+  and rebuilds the description and `metadata.json`.
+- Dashboard: for this hold the page shows "Տեղադրել առանց բաժինների" (`/publish`) and a
+  chapters field "Պահպանել բաժինները և տեղադրել" (`/chapters`, one `M:SS title` per line,
+  YouTube's rules explained in Armenian, the typed text kept on a mistake); cancel as before.
+  Both continue with Consent, so consent is still checked.
+- Checked with test.MOV in the trial DB: held at Chapters with "0 words"; the real dashboard
+  app (HTTPS test client) showed the message and both forms; a two-line list was refused with
+  the reason; a three-line list was saved, and the job finished (dry-run) with those chapters
+  in the YouTube description.
+- README staff table updated. 23 new tests (`tests/unit/test_unclear_speech.py`, 3 in
+  `tests/integration/test_chapters_stage.py`). Full suite: 1336 passed (-W error), ruff clean.
 
 ### 2026-11-21 15:21 — T-1011 Board framing on a light wall (user request, D-063) — DONE
 

@@ -20,8 +20,9 @@ from reel.llm import FakeLLM
 from reel.media.ffmpeg import probe
 from reel.media.testmedia import Part as Scene
 from reel.media.testmedia import make_lesson
+from reel.metadata.chapters import NOT_GENERATED
 from reel.queue import JobQueue, StageRegistry, Worker, create_job
-from reel.stages.chapters import METADATA_FILE, THUMBNAIL_FILE, ChaptersStage
+from reel.stages.chapters import METADATA_FILE, SPEECH_UNCLEAR, THUMBNAIL_FILE, ChaptersStage
 from reel.stages.cleaning import CLEANED_FILE
 from reel.stt import Segment, Transcription, save_transcript
 
@@ -87,8 +88,11 @@ def cleaned_video(tmp_path_factory) -> Path:
 def setup(project, write_config, cleaned_video):
     opened = []
 
-    def setup(*, group: str | None = "Python 12", lesson: int | None = 14):
-        write_config(CONFIG)
+    def setup(
+        *, group: str | None = "Python 12", lesson: int | None = 14,
+        transcript: Transcription | None = None, metadata: str = "",
+    ):  # fmt: skip
+        write_config(CONFIG.replace("[metadata]\n", "[metadata]\n" + metadata))
         cfg = load_config(project / "config" / "reel.toml")
         init_database(cfg.paths.database_file)
         db = open_database(cfg.paths.database_file)
@@ -98,7 +102,7 @@ def setup(project, write_config, cleaned_video):
             recording.group_name, recording.lesson_number = group, lesson
             s.add(recording)
             job_id = create_job(s, recording, stage=Stage.CHAPTERS).id
-            save_transcript(s, job_id, TranscriptKind.CLEAN, clean_transcript())
+            save_transcript(s, job_id, TranscriptKind.CLEAN, transcript or clean_transcript())
         job_dir = cfg.paths.data_dir / "jobs" / str(job_id)
         job_dir.mkdir(parents=True)
         (job_dir / CLEANED_FILE).write_bytes(cleaned_video.read_bytes())
@@ -109,8 +113,9 @@ def setup(project, write_config, cleaned_video):
         db.dispose()
 
 
-def work(cfg, db) -> list:
-    registry = StageRegistry([ChaptersStage(lambda cfg: FakeLLM([scripted] * 100))])
+def work(cfg, db, answers=None) -> list:
+    answers = [scripted] * 100 if answers is None else answers
+    registry = StageRegistry([ChaptersStage(lambda cfg: FakeLLM(answers))])
     attention: list = []
     worker = Worker(db, registry, lambda: cfg, notifier=attention.append)
     worker.start(until_idle=True)
@@ -173,3 +178,46 @@ def test_an_unknown_group_is_held_too(setup):
     job, _ = load(db, job_id)
     assert (job.status, job.hold_reason) == (JobStatus.ON_HOLD, "identification")
     assert 'The group "Nobody 99" is not in config/groups.toml' in job.hold_message
+
+
+# --- T-1012: the speech is not clear -------------------------------------------------------
+
+SILENT = Transcription("hy", (), "fake")  # the microphone was off: nothing was recognised
+
+
+def test_unclear_speech_holds_for_staff_with_the_title_ready(setup):
+    cfg, db, job_id, job_dir = setup(transcript=SILENT)
+    (attention,) = work(cfg, db, answers=[])  # the LLM is not needed and not asked
+    job, row = load(db, job_id)
+    assert (job.stage, job.status, job.hold_reason) == (
+        Stage.CHAPTERS,
+        JobStatus.ON_HOLD,
+        SPEECH_UNCLEAR,
+    )
+    assert job.hold_message.startswith("Տեսանյութում խոսքը պարզ չէ (0 ճանաչված բառ 30 րոպեում)")
+    assert set(job.flags) == {NOT_GENERATED, SPEECH_UNCLEAR}
+    assert "hold" in attention.kind or attention.kind == "held"
+    # Everything else is ready, so publishing it as it is only needs the staff's decision.
+    assert row.title == "Python 12 · Դաս 14" and row.chapters == []
+    assert row.description == "Python 12, դաս 14"
+    assert row.generator["chapter_details"]["words"] == 0
+    assert (job_dir / METADATA_FILE).is_file() and (job_dir / THUMBNAIL_FILE).is_file()
+    JobQueue(db).release(job_id, "staff", advance=True)
+    job, _ = load(db, job_id)
+    assert (job.stage, job.status) == (Stage.CONSENT, JobStatus.QUEUED)
+
+
+def test_little_speech_with_chapters_found_needs_no_decision(setup):
+    sparse = tuple(s for s in clean_transcript().segments if s.start % 60 == 0)  # ~11 words/min
+    cfg, db, job_id, _ = setup(transcript=Transcription("hy", sparse, "fake"))
+    assert work(cfg, db) == []
+    job, row = load(db, job_id)
+    assert (job.stage, job.status) == (Stage.CONSENT, JobStatus.QUEUED)
+    assert len(row.chapters) == 3 and row.generator["chapter_details"]["words_per_minute"] < 20
+
+
+def test_the_check_can_be_turned_off(setup):
+    cfg, db, job_id, _ = setup(transcript=SILENT, metadata="min_words_per_minute = 0\n")
+    assert work(cfg, db, answers=[]) == []
+    job, _ = load(db, job_id)
+    assert (job.stage, job.status, job.flags) == (Stage.CONSENT, JobStatus.QUEUED, [NOT_GENERATED])

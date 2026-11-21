@@ -39,7 +39,24 @@
 
 <section class="card actions">
   <h2>Գործողություններ</h2>
-  {% if d.can_release %}
+  {% if d.status.value == "on_hold" and d.hold_reason == speech_unclear %}
+  <p>Տեսանյութում խոսքը պարզ չէ, ուստի բաժիններ չգտնվեցին։ Դիտեք տեսանյութը և որոշեք՝ տեղադրել այն, թե չեղարկել (ներքևում)։</p>
+  <form method="post" action="/recordings/{{ d.job_id }}/publish">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <h3>Տեղադրել առանց բաժինների</h3>
+    <label for="publish-note">Նշում (ըստ ցանկության)</label>
+    <input id="publish-note" name="note" maxlength="1000">
+    <button type="submit">Տեղադրել առանց բաժինների</button>
+  </form>
+  <form method="post" action="/recordings/{{ d.job_id }}/chapters">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <h3>Տեղադրել իմ նշած բաժիններով</h3>
+    <p class="muted small">Ամեն տողում մեկ բաժին՝ սկզբի ժամանակը վերևի տեսանյութում և անունը։ Առաջինը սկսվում է 0:00-ից, պետք է լինի առնվազն {{ chapter_rules[0] }} բաժին, յուրաքանչյուրը՝ առնվազն {{ "%g"|format(chapter_rules[1]) }} վայրկյան։</p>
+    <label for="staff-chapters">Բաժիններ</label>
+    <textarea id="staff-chapters" name="chapters" rows="6" maxlength="20000" required placeholder="0:00 Ներածություն&#10;4:30 Ֆունկցիաներ&#10;12:05 Օրինակներ">{{ chapters_text }}</textarea>
+    <button type="submit">Պահպանել բաժինները և տեղադրել</button>
+  </form>
+  {% elif d.can_release %}
   <form method="post" action="/recordings/{{ d.job_id }}/release">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
     <label for="release-note">Նշում (ըստ ցանկության)</label>

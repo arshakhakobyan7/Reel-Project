@@ -68,6 +68,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-061 | A group typed in the dashboard is added to groups.toml at once; the transcript is not shown on the recording page | user | Accepted |
 | D-062 | English programming terms stay English in the transcript: a term fixer after Whisper; no prompt in every window | user + agent | Accepted |
 | D-063 | Board framing on a light wall: the board's frame lines; legs under a desk left out | user + agent | Accepted |
+| D-064 | Unclear speech: the job waits; staff publish it as it is, with chapters they set, or cancel it | user | Accepted |
 
 ---
 
@@ -663,3 +664,18 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
   - Without a line above and below, the old rule stays: a surface that fills the picture both ways is the room, and only the work box is used.
   - A board told apart by brightness (as in the first trial lesson, a dark board in a light room) is framed as before.
 - **Result:** the test recording: board 0.125–0.887 × 0.32–0.84 of the picture, zoom 1.24x, all four panels in the picture. IMG_0359: unchanged (1.12x).
+
+### D-064 — A video whose speech is not clear waits for staff
+- **Date:** 2026-11-21 · **Source:** the user, after a test recording without audible speech (T-1012) · **Status:** Accepted
+- **What happened:** the user's test recording had no speech in its audio (a steady room noise at about −45 dB). Whisper recognised nothing, no chapters could be made, and the job went on to Done. With YouTube live it would have been uploaded without chapters, and nobody would have been asked.
+- **The user's rule:** tell staff that the speech in the video is not clear and that this is why no chapters could be found. Staff decide: publish it as it is, or cancel it. When they publish, they may set the chapters themselves.
+- **Decision:**
+  - **When:** no chapters could be made and the cleaned video has fewer than `[metadata] min_words_per_minute` (default 20) recognised words per minute. A real lesson had about 70. Few words with chapters found is not held. 0 turns the check off.
+  - The Chapters stage still makes the title, the description (without chapters) and the thumbnail. Then the job goes on hold with the reason `speech_unclear`, the flag of the same name, and an Armenian message with the word count. The hold reaches staff like every hold: the dashboard (status "Սպասում է որոշման") and the staff alert in Slack when notifications are live.
+  - **The recording page** shows, for this hold, instead of "accept / check again":
+    - **Publish without chapters** (`POST /recordings/{id}/publish`): the job goes on to Consent, then Upload.
+    - **Publish with my chapters** (`POST /recordings/{id}/chapters`): one chapter per line, the start in the cleaned video (the page's player) and the title, for example `4:30 Ֆունկցիաներ`. The list must follow YouTube's rules: the first at 0:00, at least `min_chapters`, each at least `min_chapter_seconds`, in order, inside the video. A mistake is explained in Armenian, and the typed text stays in the field. The chapters and the description rebuilt with them are stored (`set_staff_chapters`, also in `metadata.json`), with who set them and when. The flag `chapters_not_generated` is replaced by `chapters_by_staff`.
+    - **Cancel**: the existing cancel form. Nothing is published.
+  - Both publish actions work only on a job held for this reason. They are recorded as releases with a note ("published without chapters", "published with N chapters set by staff").
+  - Consent is still checked after the decision: publishing never skips it.
+- **Rejected:** asking the LLM for chapters from the few words. With almost no text it would invent topics.

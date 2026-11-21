@@ -184,6 +184,7 @@ chapter_start_phrases = [                  # a chapter starts exactly at such a 
     "հիմա կխոսենք", "հիմա խոսենք", "սկսենք", "let's move on", "next topic",
 ]
 thumbnail_enabled = true
+min_words_per_minute = 20.0                # no chapters and less speech: staff decide (T-1012); 0 = never
 
 [consent]                                  # FR-20 ... FR-22 (D-008, D-019)
 provider = "file"                          # "file" = interim registry, "http" = Core Engine

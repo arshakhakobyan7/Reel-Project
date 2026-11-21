@@ -37,6 +37,8 @@ FLAG_LABELS: dict[str, str] = {
     "lesson_end_not_found": "Դասի ավարտը չի գտնվել",
     "lesson_boundaries_conflict": "Դասի սահմանները հակասում են",
     "chapters_not_generated": "Գլուխները չեն ստեղծվել",
+    "speech_unclear": "Խոսքը պարզ չէ",
+    "chapters_by_staff": "Գլուխները նշել է աշխատակիցը",
     "thumbnail_not_made": "Նկարը (thumbnail) չի ստեղծվել",
     "description_chapters_dropped": "Նկարագրության գլուխները կրճատվել են",
     "description_footer_truncated": "Նկարագրության վերջը կրճատվել է",
@@ -112,6 +114,7 @@ HOLD_LABELS: dict[str, str] = {
     "consent_opted_out": "Ուսանողը համաձայն չէ հրապարակմանը",
     "consent_unknown": "Համաձայնությունն անհայտ է",
     "consent_unreachable": "Համաձայնության աղբյուրն անհասանելի է",
+    "speech_unclear": "Խոսքը պարզ չէ, բաժիններ չեն գտնվել",
 }
 
 
@@ -137,6 +140,10 @@ DONE_MESSAGES: dict[str, str] = {
     "identified": "Խումբը և դասը պահպանվեցին։",
     "rerun": "Job-ը կաշխատի նորից ընտրված փուլից։",
     "retried": "Նոր փորձը կսկսվի հենց հիմա։",
+    "published": "Տեսանյութը կտեղադրվի առանց բաժինների (համաձայնության ստուգումից հետո)։",
+    "chapters": (
+        "Բաժինները պահպանվեցին. տեսանյութը կտեղադրվի դրանցով (համաձայնության ստուգումից հետո)։"
+    ),
 }
 
 ACTION_FAILED = "Գործողությունը հնարավոր չէ այս վիճակում"

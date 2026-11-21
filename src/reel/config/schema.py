@@ -388,6 +388,9 @@ class MetadataSettings(Section):
         "next topic",
     )
     thumbnail_enabled: bool = True
+    # No chapters and fewer words per minute of video than this: the speech is not clear, and
+    # staff decide whether to publish (with chapters they set) or cancel (T-1012). 0 = never.
+    min_words_per_minute: float = Field(default=20.0, ge=0, le=300)
 
     @field_validator("title_template")
     @classmethod

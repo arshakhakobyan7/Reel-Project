@@ -8,6 +8,11 @@
 4. Thumbnail from the cleaned video (T-503): the main topic as the big text, the video title
    below it. A thumbnail that cannot be made is a flag, not a failure (it is optional, FR-18).
 5. One ``video_metadata`` row (replaced on a re-run) and ``metadata.json`` in the job folder.
+6. **Unclear speech (T-1012, D-064):** when no chapters could be made and the video has fewer
+   than ``min_words_per_minute`` recognised words per minute, the speech is not clear (a
+   microphone that was off, a far-away voice). The title, description and thumbnail are still
+   stored, then the job goes on hold ("speech_unclear") and staff are told. They publish the
+   video as it is, publish it with chapters they set (``set_staff_chapters``), or cancel it.
 """
 
 import json
@@ -20,15 +25,15 @@ from typing import Any
 
 from reel.config.groups import missing_group_message
 from reel.config.loader import LoadedConfig
-from reel.db import Job, Stage, TranscriptKind, VideoMetadata
+from reel.db import Job, Stage, TranscriptKind, VideoMetadata, utcnow
 from reel.llm import LLMClient, LLMError, MeteredLLM, OnDemandLLM
 from reel.media.ffmpeg import FfmpegCancelled, FfmpegError, probe
 from reel.media.thumbnail import MissingGlyphs, make_thumbnail
 from reel.metadata.chapters import NOT_GENERATED, ChapterResult, generate_chapters, topic_summary
-from reel.metadata.text import MetadataTextError, build_description, render_title
+from reel.metadata.text import Chapter, MetadataTextError, build_description, render_title
 from reel.queue.stage import Hold, StageContext, StageFailed, StageHandler, StageResult
 from reel.stages.cleaning import CLEANED_FILE
-from reel.stt import load_transcript
+from reel.stt import Transcription, load_transcript
 
 log = logging.getLogger("reel.metadata")
 
@@ -36,6 +41,23 @@ THUMBNAIL_FILE = "thumbnail.jpg"
 METADATA_FILE = "metadata.json"
 IDENTIFICATION = "identification"
 NO_THUMBNAIL = "thumbnail_not_made"
+SPEECH_UNCLEAR = "speech_unclear"  # the hold reason and the flag (T-1012)
+STAFF_CHAPTERS = "chapters_by_staff"
+
+
+def speech_rate(transcript: Transcription, duration: float) -> tuple[int, float]:
+    """The recognised words and the words per minute of the video."""
+    words = sum(len(segment.text.split()) for segment in transcript.segments)
+    return words, (words / (duration / 60) if duration > 0 else 0.0)
+
+
+def unclear_speech_message(words: int, duration: float) -> str:
+    minutes = max(1, round(duration / 60))
+    return (
+        f"Տեսանյութում խոսքը պարզ չէ ({words} ճանաչված բառ {minutes} րոպեում), դրա պատճառով "
+        "բաժիններ հնարավոր չեղավ գտնել։ Դիտեք տեսանյութը և որոշեք՝ տեղադրել այսպես (կարող "
+        "եք նշել բաժիններն ինքներդ), թե չեղարկել։"
+    )
 
 
 def main_topic(result: ChapterResult) -> str:
@@ -105,6 +127,9 @@ class ChaptersStage(StageHandler):
             result = ChapterResult([], [NOT_GENERATED], 0, {"rejected": "empty transcript"})
         result.details["duration"] = duration
         summary, topic = topic_summary(result), main_topic(result)
+        words, rate = speech_rate(transcript, duration)
+        unclear = not result.chapters and rate < settings.min_words_per_minute
+        result.details.update(words=words, words_per_minute=round(rate, 1))
 
         # Title and description.
         fields = {
@@ -123,7 +148,7 @@ class ChaptersStage(StageHandler):
             )
         except MetadataTextError as exc:
             raise StageFailed(f"title/description: {exc}", retryable=False) from exc
-        flags = [*result.flags, *description.flags]
+        flags = [*result.flags, *description.flags, *([SPEECH_UNCLEAR] if unclear else [])]
 
         # Thumbnail.
         thumbnail = None
@@ -152,6 +177,9 @@ class ChaptersStage(StageHandler):
             session.add(row)
             for flag in flags:
                 job.add_flag(flag)
+        if unclear:
+            log.info("speech not clear: %d words, %.1f per minute; staff decide", words, rate)
+            raise Hold(SPEECH_UNCLEAR, unclear_speech_message(words, duration))
         return StageResult(
             metrics={
                 "chapters": len(chapters),
@@ -196,3 +224,46 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
     partial = path.with_name(path.name + ".part")
     partial.write_text(json.dumps(data, ensure_ascii=False, indent=1, default=str), "utf-8")
     os.replace(partial, path)
+
+
+def video_duration(row: VideoMetadata) -> float:
+    """The cleaned video's length, as measured when the chapters were made."""
+    return float((row.generator or {}).get("chapter_details", {}).get("duration") or 0.0)
+
+
+def set_staff_chapters(
+    job: Job, chapters: list[Chapter], cfg: LoadedConfig, by: str
+) -> list[dict[str, Any]]:
+    """Store the chapters staff set for a video whose speech was not clear (T-1012): the
+    chapter list, the description rebuilt with them, and ``metadata.json``."""
+    row = job.video_metadata
+    if row is None:
+        raise ValueError("the video has no title and description yet")
+    recording, settings = job.recording, cfg.settings.metadata
+    duration = video_duration(row)
+    fields = {
+        "group": recording.group_name or "",
+        "lesson": recording.lesson_number,
+        "date": recording.recording_date.isoformat() if recording.recording_date else "",
+    }
+    try:
+        description = build_description(
+            summary=row.summary, chapters=chapters, duration=duration,
+            footer_fields={**fields, "title": row.title}, settings=settings,
+        )  # fmt: skip
+    except MetadataTextError as exc:
+        raise ValueError(str(exc)) from exc
+    listed = [{"start": round(c.start, 3), "title": c.title} for c in chapters]
+    generator = dict(row.generator or {})
+    generator["staff_chapters"] = {"by": by, "at": utcnow().isoformat(), "count": len(listed)}
+    row.chapters, row.description, row.generator = listed, description.text, generator
+    job.flags = [flag for flag in job.flags if flag != NOT_GENERATED]
+    job.add_flag(STAFF_CHAPTERS)
+    folder = cfg.paths.data_dir / "jobs" / str(job.id)
+    if folder.is_dir():
+        _write_json(
+            folder / METADATA_FILE,
+            {"title": row.title, "summary": row.summary, "description": row.description,
+             "chapters": listed, "thumbnail": row.thumbnail_path, "generator": generator},
+        )  # fmt: skip
+    return listed

@@ -12,12 +12,17 @@ from datetime import date
 
 from reel.config.groups import GroupsFile, add_group
 from reel.config.loader import LoadedConfig
+from reel.config.schema import MetadataSettings
+from reel.metadata.text import Chapter, ChapterError, check_chapters, format_timestamp
 
 log = logging.getLogger("reel.web")
 
 MAX_GROUP_LENGTH = 100
 _SPACES = re.compile(r"\s+")
 _NUMBER = re.compile(r"\d{1,5}")
+MAX_CHAPTERS = 100
+# "4:30 Ֆունկցիաներ", "1:02:30 - Օրինակներ", "(0:00) Ներածություն"
+_CHAPTER = re.compile(r"^\(?(\d{1,3}(?::\d{2}){1,2})\)?\s*(?:[-–—:.|]\s*)?(.*)$")
 
 
 def parse_group(text: str, groups: GroupsFile) -> str:
@@ -64,3 +69,61 @@ def parse_lesson(text: str | int | None) -> int | None:
 
 def _not_a_number() -> int:
     raise ValueError("Դասի համարը պետք է լինի թիվ (0, 1, 2 …)։ Թվերը գրեք լատինական ստեղնաշարով։")
+
+
+def _seconds(clock: str) -> int | None:
+    parts = [int(part) for part in clock.split(":")]
+    if any(part >= 60 for part in parts[1:]) or (len(parts) == 3 and parts[0] > 99):
+        return None
+    total = 0
+    for part in parts:
+        total = total * 60 + part
+    return total
+
+
+def parse_chapters(text: str, duration: float, settings: MetadataSettings) -> list[Chapter]:
+    """The chapters staff type for a video whose speech was not clear (T-1012), one per line:
+    the start in the cleaned video (as in the dashboard's player), then the title. The list
+    must follow YouTube's rules. Raises ValueError with an Armenian message."""
+    chapters: list[Chapter] = []
+    for number, line in enumerate((text or "").splitlines(), 1):
+        line = _SPACES.sub(" ", unicodedata.normalize("NFC", line)).strip()
+        if not line:
+            continue
+        found = _CHAPTER.match(line)
+        start = _seconds(found.group(1)) if found else None
+        title = found.group(2).strip() if found else ""
+        if start is None or not title:
+            raise ValueError(
+                f"Տող {number}. «{line[:60]}» հասկանալի չէ։ Գրեք սկզբի ժամանակը և բաժնի "
+                "անունը, օրինակ՝ «4:30 Ֆունկցիաներ»։"
+            )
+        chapters.append(Chapter(float(start), title))
+    if len(chapters) < settings.min_chapters:
+        raise ValueError(
+            f"Նշեք առնվազն {settings.min_chapters} բաժին. YouTube-ը ավելի քիչ բաժին ցույց չի տալիս։"
+        )
+    if len(chapters) > MAX_CHAPTERS:
+        raise ValueError(f"Շատ բաժիններ են (առավելագույնը {MAX_CHAPTERS})։")
+    long, minimum = duration >= 3600, settings.min_chapter_seconds
+    if chapters[0].start > minimum:
+        raise ValueError("Առաջին բաժինը պետք է սկսվի 0:00-ից։")
+    for chapter in chapters:
+        if chapter.start >= duration:
+            raise ValueError(
+                f"«{chapter.title}» բաժինը ({format_timestamp(chapter.start, long=long)}) "
+                f"տեսանյութից դուրս է. տեսանյութը {format_timestamp(duration, long=long)} է։"
+            )
+    for before, after in zip(chapters, chapters[1:], strict=False):
+        if after.start <= before.start:
+            raise ValueError(
+                f"Բաժինները գրեք ժամանակի հերթականությամբ. «{after.title}»-ը "
+                f"({format_timestamp(after.start, long=long)}) «{before.title}»-ից առաջ է։"
+            )
+    for chapter, end in zip(chapters, [c.start for c in chapters[1:]] + [duration], strict=True):
+        if end - chapter.start < minimum:
+            raise ValueError(f"«{chapter.title}» բաժինը պետք է տևի առնվազն {minimum:g} վայրկյան։")
+    try:
+        return check_chapters(chapters, duration, settings)
+    except ChapterError as exc:  # a rule not explained above
+        raise ValueError(str(exc)) from exc

@@ -145,6 +145,7 @@ only copy, and the daily cleanup does not remove it.
 |---|---|
 | **Սպասում է որոշման** (on hold) for identification | Set the group and lesson number on the recording's page. Reel continues by itself. |
 | On hold for consent | Watch the video. **Ընդունել և շարունակել** publishes it anyway; **Չեղարկել** publishes nothing. |
+| On hold: **Խոսքը պարզ չէ, բաժիններ չեն գտնվել** (unclear speech) | Watch the video. **Տեղադրել առանց բաժինների** publishes it without chapters. To add chapters, type one per line (`4:30 Ֆունկցիաներ`, times as in the page's player) and press **Պահպանել բաժինները և տեղադրել**. **Չեղարկել** publishes nothing. |
 | **Ձախողված** (failed) | Read the error, fix its cause, then **Վերագործարկել** (re-run) from the failed stage. |
 | A wrong cut | Change the cleaning setting, then re-run from **Մաքրում** (cleaning). Posts are updated, not posted again. |
 

@@ -36,8 +36,9 @@ from reel.db import Database, Job, Recording, StaffUser, normalize_username, utc
 from reel.db.enums import JobStatus, Stage
 from reel.queue.jobs import InvalidTransition, JobNotFound, JobQueue
 from reel.retention import on_youtube
+from reel.stages.chapters import SPEECH_UNCLEAR, set_staff_chapters, video_duration
 from reel.web import api, detail, texts, uploads, views
-from reel.web.forms import ensure_group, parse_lesson
+from reel.web.forms import ensure_group, parse_chapters, parse_lesson
 from reel.web.security import (
     LoginThrottle,
     Session,
@@ -170,6 +171,11 @@ async def csrf_guard(request: Request) -> None:
             token = value if isinstance(value, str) else None
     if not csrf_matches(request.state.session, token):
         raise CsrfFailed()
+
+
+def _unclear(job: Job) -> bool:
+    """The job waits for staff to decide about a video whose speech was not clear (T-1012)."""
+    return job.status is JobStatus.ON_HOLD and job.hold_reason == SPEECH_UNCLEAR
 
 
 def render(request: Request, name: str, context: dict[str, Any], status: int = 200) -> Response:
@@ -331,7 +337,7 @@ def create_app(
 
     def detail_page(
         request: Request, job_id: int, *, message: str | None = None, error: str | None = None,
-        status: int = 200,
+        status: int = 200, chapters_text: str = "",
     ) -> Response:  # fmt: skip
         state = _state(request)
         cfg = state.config()
@@ -351,6 +357,12 @@ def create_app(
             "groups": sorted(cfg.groups.groups, key=str.casefold),
             "video": detail.video_path(job_id, cfg.paths.data_dir) is not None,
             "on_youtube": on_tube,
+            "chapters_text": chapters_text,
+            "speech_unclear": SPEECH_UNCLEAR,
+            "chapter_rules": (
+                cfg.settings.metadata.min_chapters,
+                cfg.settings.metadata.min_chapter_seconds,
+            ),
         }
         return render(request, "recording.html", context, status=status)
 
@@ -414,6 +426,55 @@ def create_app(
         return act(
             request, job_id, user, "accepted" if forward else "released",
             lambda queue, by: queue.release(job_id, by, advance=forward, note=note.strip()),
+        )  # fmt: skip
+
+    @app.post("/recordings/{job_id}/publish")
+    def publish(
+        request: Request, job_id: int, user: Annotated[Staff, Depends(staff)], note: Note = ""
+    ) -> Response:
+        """The speech was not clear (T-1012): publish the video as it is, without chapters."""
+        with _state(request).db.transaction() as s:
+            job = s.get(Job, job_id)
+            if job is None:
+                raise StarletteHTTPException(404)
+            waiting = _unclear(job)
+        if not waiting:
+            log.info("staff %s: publish on job %s refused: not waiting", user.username, job_id)
+            return detail_page(request, job_id, error=texts.ACTION_FAILED, status=409)
+        text = "published without chapters" + (f": {note.strip()}" if note.strip() else "")
+        return act(
+            request, job_id, user, "published",
+            lambda queue, by: queue.release(job_id, by, advance=True, note=text),
+        )  # fmt: skip
+
+    @app.post("/recordings/{job_id}/chapters")
+    def staff_chapters(
+        request: Request, job_id: int, user: Annotated[Staff, Depends(staff)],
+        chapters: Annotated[str, Form(max_length=20000)] = "",
+    ) -> Response:  # fmt: skip
+        """The speech was not clear (T-1012): staff set the chapters, then the video goes on to
+        be published with them. A mistake in the list shows the page again with the text."""
+        state = _state(request)
+        cfg = state.config()
+        try:
+            with state.db.transaction(immediate=True) as s:
+                job = s.get(Job, job_id)
+                if job is None:
+                    raise StarletteHTTPException(404)
+                if not _unclear(job) or job.video_metadata is None:
+                    raise InvalidTransition("the job is not waiting for chapters")
+                items = parse_chapters(chapters, video_duration(job.video_metadata),
+                                       cfg.settings.metadata)  # fmt: skip
+                listed = set_staff_chapters(job, items, cfg, user.username)
+        except InvalidTransition as exc:
+            log.info("staff %s: chapters on job %s refused: %s", user.username, job_id, exc)
+            return detail_page(request, job_id, error=texts.ACTION_FAILED, status=409)
+        except ValueError as exc:
+            return detail_page(request, job_id, error=str(exc), status=422, chapters_text=chapters)
+        text = f"published with {len(listed)} chapters set by staff"
+        return act(
+            request, job_id, user, "chapters",
+            lambda queue, by: queue.release(job_id, by, advance=True, note=text),
         )  # fmt: skip
 
     @app.post("/recordings/{job_id}/cancel")
