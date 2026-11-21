@@ -208,12 +208,39 @@ ruff clean) and what was run on this PC.
 
 ## Log (newest first)
 
+### 2026-11-21 20:00 — Cleanup, part 2 (the user: "delete all of them, the 1st too")
+
+- **Deleted:**
+  - `data/trial` (the T-1002 full-lesson render, 1.2 GB);
+  - the backups `reel-v2` and `reel-before-cleanup` (with their side files), which held the
+    deleted account;
+  - the admin's cancelled jobs #1 and #3, with their rows (cascade).
+- **Log:** 67 lines of the deleted account and its jobs #4–#7 were removed from
+  `logs/reel-serve.jsonl`; no line names it any more. The live server was stopped while the log
+  and the database were changed.
+- **Codex's external test:**
+  - stopped with its own `stop.ps1`: the tunnel first, then its server; port 8091 is closed and
+    no process is left;
+  - deleted: `tools/public-test` and `tools/cloudflared`, and
+    `Desktop\warehouseeel-test-access.json`, which held its test password. The warehouse
+    repo is clean.
+  - Checked first: it published nothing; its one job, a 19 s file, failed at import.
+  - Nothing in `src`, `tests` or `scripts` refers to it.
+- **Database now:**
+  - the admin account (#1) and job #2 only. Job #2 is the YouTube video; its files are kept.
+  - Integrity ok, no foreign-key problems. The only backup left is `reel-v1` (17:06, before
+    registration existed).
+- **Project:** 8,716 files and 9.6 GB without the regenerated caches. `reel serve` restarted
+  19:53; full suite 1430 passed (-W error), ruff clean. Temporary copies in the scratchpad
+  were deleted.
+
 ### 2026-11-21 19:45 — Project cleanup (the user: "only the clean project should remain")
 
 - **The user:** delete the files not needed for further work, and the registered users with
   the videos they uploaded and that were processed. Be careful not to delete important files.
 - **Checks first:**
-  - All 10 videos to be deleted were hashed against `Desktopeel_videos`. All are identical
+  - All 10 videos to be deleted were hashed against `Desktop
+eel_videos`. All are identical
     copies (IMG_0359, IMG_0360, IMG_0359_first15min, test.MOV), so no original was lost.
   - The trial renders `test_reel.mp4` and `..._reel_v2.mp4` are identical to the files in
     `reel_videos`.
