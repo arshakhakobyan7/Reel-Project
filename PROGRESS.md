@@ -222,7 +222,7 @@ ruff clean) and what was run on this PC.
   - stopped with its own `stop.ps1`: the tunnel first, then its server; port 8091 is closed and
     no process is left;
   - deleted: `tools/public-test` and `tools/cloudflared`, and
-    `Desktop\warehouseeel-test-access.json`, which held its test password. The warehouse
+    `Desktop\warehouse\reel-test-access.json`, which held its test password. The warehouse
     repo is clean.
   - Checked first: it published nothing; its one job, a 19 s file, failed at import.
   - Nothing in `src`, `tests` or `scripts` refers to it.
