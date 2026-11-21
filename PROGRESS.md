@@ -208,6 +208,13 @@ ruff clean) and what was run on this PC.
 
 ## Log (newest first)
 
+### 2026-11-21 20:10 — New backup of the clean database (user request)
+
+- New: `data/backups/reel-clean-20261121T160828Z.db`, made with SQLite's online backup
+  (`backup_database`). Its content was checked: integrity ok, schema 3, the admin account (#1)
+  and job #2. It was made a single file (journal mode DELETE).
+- Deleted after that: `reel-v1-20261121T130642Z.db`. It is now the only backup.
+
 ### 2026-11-21 20:00 — Cleanup, part 2 (the user: "delete all of them, the 1st too")
 
 - **Deleted:**
