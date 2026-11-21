@@ -74,6 +74,7 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 | D-067 | Duplicates per account: a video only processed is compared only with the same account's videos in progress or ready | user | Accepted |
 | D-068 | "My page": every account updates its own details and password; the username never changes; sign-in by username or email; users see no cost panel | user + agent | Accepted |
 | D-069 | The live server runs a reviewed commit from its own folder (`ReelProject-live`), not the files being edited | agent (after an outage) | Accepted |
+| D-070 | Reel online for a few days on a Google Cloud Free Trial VM (Linux): YouTube live, real lessons allowed, open registration | user | Accepted |
 
 ---
 
@@ -793,3 +794,30 @@ Status: `Accepted` · `Proposed` (waiting for user confirmation) · `Superseded`
 - **Rejected:**
   - Restarting on the folder being edited: it would have loaded GPT's unfinished, unreviewed code.
   - Undoing GPT's changes: they are its task in progress.
+
+### D-070 — Reel online for a few days on a Google Cloud Free Trial VM
+- **Date:** 2026-11-22 · **Source:** the user · **Status:** Accepted
+- **The user:** Reel must work for a few days without the PC, so that other people can check the project; afterwards it is not needed.
+- **Checked (official pages, 2026-11-22):**
+  - **Google Cloud Free Trial:** $300 for 90 days. Nothing is billed unless the account is upgraded. When the trial ends, resources are stopped, then deleted after 30 days. No Windows Server images and no GPUs. A card is needed.
+  - **Always Free tiers:** none can run Reel for long.
+    - Google's `e2-micro` (1 GB RAM, 30 GB disk) cannot.
+    - Oracle's A1 was cut to 2 OCPU / 12 GB in August 2026: it would run, but slowly.
+  - For a few days the Free Trial fits, and keeps D-009 (no payment).
+- **The user's choices:**
+  - YouTube **live** from the server, with the PC's channel token moved there;
+  - **real lessons too** may be processed in Google's data centre. This lifts "lessons are processed only on this PC" for the time of the review. The academy's consent is the user's matter;
+  - **open registration** (D-065).
+- **Decision (T-1018):**
+  - **The VM:** Ubuntu 24.04 `e2-standard-8`, 200 GB disk, Europe.
+  - **Reel:** `/opt/reel` as the service account `reel` (systemd), on 127.0.0.1:8080, the same `config/reel.toml` as the PC.
+  - **Server settings:** in `.env` (`deploy/gcp/server.env.template`).
+  - **HTTPS:** Caddy with a free Let's Encrypt certificate for `<ip>.sslip.io`. uvicorn trusts `X-Forwarded-For` only from 127.0.0.1, so the throttles see real addresses.
+  - **Linux needs two things that existed only for Windows:**
+    - `auth.store = "posix"`: an owner-only token file (folder 0700, file 0600); a file that others can read, or that another user owns, is refused;
+    - `KeySessionCodec`: YouTube's resumable-upload URLs are sealed with AES-GCM and a random key kept in that store (DPAPI exists only on Windows).
+  - **The database:** `data/reel.db` is copied. It brings the admin account and the record of the video already on YouTube.
+  - **Afterwards:** the VM and the firewall rule are deleted.
+- **Risks noted:**
+  - No Intel GPU on the VM: a lesson takes longer than on the PC.
+  - The PC and the VM must not both get the same lesson: two databases could publish it twice.

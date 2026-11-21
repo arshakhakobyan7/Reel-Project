@@ -23,7 +23,7 @@ from reel.publish.google_api import (
     GoogleApiError,
     GoogleResponse,
     SessionCodec,
-    WindowsSessionCodec,
+    default_session_codec,
 )
 
 log = logging.getLogger("reel.publish.youtube")
@@ -188,7 +188,7 @@ class YoutubePublisher:
         self.api_url, self.upload_url = api_url, upload_url
         self.chunk_size, self.sleep = chunk_size, sleep
         self.timeout, self.max_retries, self.max_pages = timeout_seconds, max_retries, max_pages
-        self.codec = session_codec if session_codec is not None else WindowsSessionCodec()
+        self.codec = session_codec if session_codec is not None else default_session_codec(tokens)
 
     def publish(
         self,

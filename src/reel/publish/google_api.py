@@ -323,3 +323,75 @@ class WindowsSessionCodec:
             raise _invalid(
                 "Cannot restore resumable upload state.", "invalid_session_state"
             ) from None
+
+
+class KeyValueStore(Protocol):
+    def get(self, key: str) -> str | None: ...
+
+    def set(self, key: str, value: str) -> None: ...
+
+
+UPLOAD_SESSION_KEY = "upload_session_key"  # the name of the AES key in the secret store
+_SESSION_AAD = b"reel-upload-session"
+
+
+class KeySessionCodec:
+    """Protect upload session URLs with AES-GCM where Windows DPAPI does not exist (T-1018).
+
+    The random 256-bit key lives in Reel's secret store (on a Linux server the owner-only
+    ``posix`` store), beside the OAuth token. So the URLs saved in the database are useless
+    without that file."""
+
+    PREFIX = "aesgcm:"
+
+    def __init__(self, store: KeyValueStore) -> None:
+        self.store = store
+
+    def _key(self) -> bytes:
+        stored = self.store.get(UPLOAD_SESSION_KEY)
+        if stored is None:
+            stored = base64.b64encode(os.urandom(32)).decode("ascii")
+            self.store.set(UPLOAD_SESSION_KEY, stored)
+        register_secret(stored)
+        try:
+            key = base64.b64decode(stored, validate=True)
+        except ValueError:
+            key = b""
+        if len(key) != 32:
+            raise _invalid("The upload session key in the secret store is not valid.")
+        return key
+
+    def seal(self, url: str) -> str:
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        nonce = os.urandom(12)
+        sealed = AESGCM(self._key()).encrypt(nonce, url.encode("utf-8"), _SESSION_AAD)
+        return self.PREFIX + base64.b64encode(nonce + sealed).decode("ascii")
+
+    def unseal(self, protected: str) -> str:
+        from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        try:
+            if not protected.startswith(self.PREFIX):
+                raise ValueError("invalid codec")
+            raw = base64.b64decode(protected[len(self.PREFIX) :], validate=True)
+            if len(raw) < 12 + 16:
+                raise ValueError("too short")
+            return AESGCM(self._key()).decrypt(raw[:12], raw[12:], _SESSION_AAD).decode("utf-8")
+        except ValueError, UnicodeError, InvalidTag:
+            raise _invalid(
+                "Cannot restore resumable upload state.", "invalid_session_state"
+            ) from None
+
+
+def default_session_codec(tokens: object | None) -> SessionCodec:
+    """DPAPI on Windows; elsewhere AES-GCM with a key in the tokens' secret store (T-1018).
+    Without a store (no tokens: dry-run) the DPAPI codec is kept: it is never used then, and it
+    fails with a clear message if it is."""
+    if os.name == "nt":
+        return WindowsSessionCodec()
+    store = getattr(tokens, "store", None)
+    if store is None:
+        return WindowsSessionCodec()
+    return KeySessionCodec(store)

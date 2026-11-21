@@ -9,7 +9,7 @@
 | **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 59 of 61 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
 | **Last completed task** | T-1017 — «Հատվածավորում» section heading (GPT, reviewed; 2026-11-21 19:10) |
-| **Current task** | — (offered: ID-only logging instead of usernames/emails) |
+| **Current task** | T-1018 — Reel on a Google Cloud Free Trial VM for a few days (D-070); code and deploy kit ready, waiting for the user's Google Cloud account |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
 | **Waiting for approval** | Since 2026-11-20 14:10: report after each task and wait for the user's OK before the next. |
@@ -207,6 +207,37 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-22 — T-1018 Reel online for a few days (D-070) — IN PROGRESS: code and deploy kit ready
+
+- **The user:**
+  - Asked whether "Google Cloud Free Trial + Compute Engine" (GPT's advice) is a free way to
+    deploy. It is a 90-day trial, not free hosting, and no Always Free tier can run Reel
+    (official pages checked).
+  - Then: only a few days are needed, for reviewers. So the Free Trial fits.
+  - Choices: YouTube live, real lessons too, open registration.
+- **Linux readiness:**
+  - The code already guards Windows calls: `CREATE_NO_WINDOW`, `power.py`, process checks,
+    `hwaccel`, the encoder falls back to libx264.
+  - All key packages have Linux 3.14 wheels (PyPI checked).
+  - Two Windows-only parts got a Linux version:
+    - `PosixSecretStore` (`auth.store = "posix"`, owner-only file, refuses loose
+      permissions);
+    - `KeySessionCodec` (AES-GCM, key in the store) through `default_session_codec(tokens)`
+      in `YoutubePublisher`.
+  - Tests: `tests/unit/test_server_secrets.py` (4 of them run only on POSIX) and a
+    crash-resume test with the key codec in `test_youtube.py`.
+- **Deploy kit `deploy/gcp/`:**
+  - `setup.sh`: apt FFmpeg + Caddy, uv + Python 3.14, Reel, Ollama v0.40.16 Linux checked by
+    SHA-256, the models, `.env`, systemd, Caddy;
+  - `reel.service`, `Caddyfile.template`, `server.env.template`, `README.md`;
+  - `.gitattributes` keeps LF for them.
+- **Checks:** full suite 1440 passed, 4 skipped (POSIX-only), -W error; ruff clean.
+- **Next:**
+  - the user starts the Free Trial;
+  - Claude installs the Google Cloud CLI on the PC, the user signs in once;
+  - then the VM, the copy, `setup.sh`, the token move, the tests on Linux and one lesson
+    end to end.
 
 ### 2026-11-21 20:10 — New backup of the clean database (user request)
 

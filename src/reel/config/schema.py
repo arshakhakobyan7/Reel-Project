@@ -429,10 +429,12 @@ class AuthSettings(Section):
     """Where OAuth tokens are kept (T-701, NFR-5). Static secrets stay in the environment/.env."""
 
     # "windows": Windows Credential Manager (encrypted by Windows for this user account);
+    # "posix": an owner-only file on a Linux server (folder 0700, file 0600; T-1018);
     # "file": a plain JSON file for development only (a warning is logged on every use).
-    store: Literal["windows", "file"] = "windows"
+    store: Literal["windows", "posix", "file"] = "windows"
     store_namespace: str = Field(default="Reel", pattern=r"^[A-Za-z0-9._-]{1,40}$")
     dev_file: str = "data/secrets.dev.json"
+    posix_file: str = "data/secrets/tokens.json"  # used only when store = "posix"
 
 
 class YoutubeSettings(Section):

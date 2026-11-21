@@ -1,0 +1,8 @@
+# HTTPS for Reel (T-1018). Caddy gets a free Let's Encrypt certificate for the sslip.io name
+# (it resolves to the VM's own address) and passes every request to Reel on 127.0.0.1.
+# Caddy sets X-Forwarded-For itself; uvicorn trusts it only from 127.0.0.1, so the login and
+# registration limits see each visitor's real address.
+@HOST@ {
+	encode gzip
+	reverse_proxy 127.0.0.1:8080
+}

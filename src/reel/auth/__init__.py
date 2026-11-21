@@ -13,6 +13,7 @@ from reel.auth.google import (
 from reel.auth.store import (
     FileSecretStore,
     MemorySecretStore,
+    PosixSecretStore,
     SecretStore,
     SecretStoreError,
     WindowsCredentialStore,
@@ -26,6 +27,7 @@ __all__ = [
     "GoogleTokens",
     "MemorySecretStore",
     "OAuthClient",
+    "PosixSecretStore",
     "SecretStore",
     "SecretStoreError",
     "WindowsCredentialStore",

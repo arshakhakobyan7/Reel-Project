@@ -2,6 +2,9 @@
 
 - ``WindowsCredentialStore``: Windows Credential Manager (generic credentials, encrypted by
   Windows for the signed-in user), through ``advapi32`` with ``ctypes`` — no extra package.
+- ``PosixSecretStore``: an owner-only JSON file on a Linux server (T-1018): the folder is
+  0700 and the file 0600, and a file that others may read or that another user owns is
+  refused, as ``ssh`` does with keys.
 - ``FileSecretStore``: a JSON file for development only; every use logs a warning.
 - ``MemorySecretStore``: tests.
 
@@ -101,6 +104,67 @@ class FileSecretStore(SecretStore):
         partial = self.path.with_name(self.path.name + ".part")
         partial.write_text(json.dumps(data, indent=1), encoding="utf-8")
         os.replace(partial, self.path)
+        return True
+
+
+class PosixSecretStore(SecretStore):
+    """An owner-only JSON file for a Linux (or macOS) server, where there is no Credential
+    Manager (T-1018). Only the account that runs Reel may read it."""
+
+    name = "posix"
+
+    def __init__(self, path: Path | str) -> None:
+        if os.name == "nt":
+            raise SecretStoreError('the "posix" store is for Linux; use "windows" on Windows')
+        self.path = Path(path)
+
+    @staticmethod
+    def _private(path: Path) -> None:
+        info = path.stat()
+        if info.st_uid != os.getuid():  # type: ignore[attr-defined]  # POSIX only
+            raise SecretStoreError(f"{path.name} belongs to another user")
+        if info.st_mode & 0o077:
+            mode = "700" if path.is_dir() else "600"
+            raise SecretStoreError(f"{path.name} is open to other users; run: chmod {mode} {path}")
+
+    def _read(self) -> dict[str, str]:
+        if not self.path.is_file():
+            return {}
+        self._private(self.path.parent)
+        self._private(self.path)
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise SecretStoreError(f"cannot read {self.path.name}: {type(exc).__name__}") from None
+        if not isinstance(data, dict):
+            raise SecretStoreError(f"{self.path.name} is not a JSON object")
+        return {k: v for k, v in data.items() if isinstance(v, str)}
+
+    def _write(self, data: dict[str, str]) -> None:
+        folder = self.path.parent
+        folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(folder, 0o700)
+        partial = self.path.with_name(self.path.name + ".part")
+        descriptor = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(data, stream, indent=1)
+        os.chmod(partial, 0o600)
+        os.replace(partial, self.path)
+
+    def get(self, key: str) -> str | None:
+        return self._read().get(key)
+
+    def set(self, key: str, value: str) -> None:
+        data = self._read()
+        data[key] = value
+        self._write(data)
+
+    def delete(self, key: str) -> bool:
+        data = self._read()
+        if key not in data:
+            return False
+        del data[key]
+        self._write(data)
         return True
 
 
@@ -204,4 +268,6 @@ def make_secret_store(cfg: LoadedConfig) -> SecretStore:
     settings = cfg.settings.auth
     if settings.store == "file":
         return FileSecretStore(cfg.resolve(settings.dev_file))
+    if settings.store == "posix":
+        return PosixSecretStore(cfg.resolve(settings.posix_file))
     return WindowsCredentialStore(settings.store_namespace)

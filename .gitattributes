@@ -1,0 +1,4 @@
+# Files used on the Linux server (T-1018) keep LF line endings in every checkout and archive:
+# bash and systemd do not accept CRLF.
+*.sh text eol=lf
+deploy/gcp/* text eol=lf

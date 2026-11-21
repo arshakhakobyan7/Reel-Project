@@ -30,7 +30,7 @@ The PRD lists `Cleaned` before `Transcribed`. Here the transcript is made first,
 | 7 | Publishing: YouTube, Slack, Classroom, Academy Library | T-701 … T-706 |
 | 8 | Operations: notifications, dashboard, metrics, integration API | T-801 … T-806 |
 | 9 | Runtime, recovery, retention, packaging | T-901 … T-903 |
-| 10 | End-to-end verification and documentation | T-1001 … T-1017 |
+| 10 | End-to-end verification and documentation | T-1001 … T-1018 |
 
 ## Task summary
 
@@ -97,6 +97,7 @@ The PRD lists `Cleaned` before `Transcribed`. Here the transcript is made first,
 | T-1015 | Duplicates per account: a user's upload is not cancelled because another account has the same file; Armenian reason on the page (user report, D-067) | Must | T-204, T-1013 | DONE |
 | T-1016 | "My page" (`/profile`): every account checks and updates its details and password; sign-in by email; no cost panel for users (user request, D-068) | Must | T-1013 | DONE (GPT, reviewed) |
 | T-1017 | Rename the «Գլուխներ» section of the recording page to «Հատվածավորում» (only that section; user request) | Should | T-1016 | DONE (GPT, reviewed) |
+| T-1018 | Reel online for a few days on a Google Cloud Free Trial VM: Linux token store, AES-GCM upload state, deploy kit (user request, D-070) | Must | T-1013, T-1016 | IN PROGRESS |
 
 ---
 

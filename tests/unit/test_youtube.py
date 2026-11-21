@@ -679,3 +679,28 @@ def test_initially_expired_saved_session_checks_marker_before_a_replacement(fake
     result = publisher(fake, codec=codec).publish(upload, states[-1], on_state=states.append)
     assert result.video_id and fake.session_serial == 2 and len(fake.videos) == 1
     assert fake.count("GET", "/api/channels") == 2
+
+
+# --- T-1018: AES-GCM upload state where DPAPI does not exist (a Linux server) -------------
+
+
+def test_key_codec_crash_resume_works_in_a_new_publisher_with_the_same_store(fake, upload):
+    from reel.auth.store import MemorySecretStore
+    from reel.publish.google_api import KeySessionCodec
+
+    store = MemorySecretStore()
+    states = []
+
+    def checkpoint(details):
+        states.append(details)
+        if details.get("session"):
+            raise Crash
+
+    with pytest.raises(Crash):
+        publisher(fake, codec=KeySessionCodec(store)).publish(upload, None, on_state=checkpoint)
+    assert states[-1]["session"].startswith("aesgcm:")
+    assert "upload_id" not in states[-1]["session"]
+    result = publisher(fake, codec=KeySessionCodec(store)).publish(
+        upload, states[-1], on_state=states.append
+    )
+    assert result.video_id and len(fake.videos) == fake.session_serial == 1

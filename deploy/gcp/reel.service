@@ -1,0 +1,22 @@
+[Unit]
+Description=Reel lesson video pipeline (dashboard, watcher, worker, cleanup)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=reel
+Group=reel
+WorkingDirectory=/opt/reel
+ExecStart=/opt/reel/.venv/bin/python -m reel serve --host 127.0.0.1
+Restart=on-failure
+RestartSec=10
+# running stages get time to stop (workers.stop_grace_seconds)
+TimeoutStopSec=120
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
