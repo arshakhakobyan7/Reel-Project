@@ -164,3 +164,36 @@ ACCOUNT_MESSAGES: dict[str, str] = {
     "publish_on": "Այս օգտատիրոջ նոր տեսանյութերը կտեղադրվեն YouTube-ում։",
     "publish_off": "Այս օգտատիրոջ նոր տեսանյութերը միայն կմշակվեն։",
 }
+
+
+# --- the signed-in account's page (T-1016) ------------------------------------------------
+
+PROFILE_MESSAGES: dict[str, str] = {
+    "details": "Տվյալները պահպանվեցին։",
+    "password": "Գաղտնաբառը փոխվեց։ Մյուս սարքերում մուտքը փակվեց։",
+}
+PROFILE_LABELS: dict[str, str] = {
+    "title": "Իմ էջը",
+    "details": "Իմ տվյալները",
+    "username": "Մուտքի անուն",
+    "first_name": "Անուն",
+    "last_name": "Ազգանուն",
+    "email": "Email",
+    "phone": "Հեռախոսահամար",
+    "optional": "(ոչ պարտադիր)",
+    "created": "Գրանցվել է",
+    "last_login": "Վերջին մուտք",
+    "publishes": "Տեղադրում է YouTube-ում",
+    "processes": "Միայն մշակում",
+    "password": "Գաղտնաբառ",
+    "current_password": "Ընթացիկ գաղտնաբառ",
+    "new_password": "Նոր գաղտնաբառ (առնվազն 10 նիշ)",
+    "password_again": "Նոր գաղտնաբառը նորից",
+    "save_details": "Պահպանել տվյալները",
+    "save_password": "Փոխել գաղտնաբառը",
+}
+PROFILE_CURRENT_PASSWORD_WRONG = "Ընթացիկ գաղտնաբառը սխալ է։"
+PROFILE_PASSWORD_MISMATCH = "Գաղտնաբառերը չեն համընկնում։"
+PROFILE_PASSWORD_RULES = "Գաղտնաբառը պետք է ունենա առնվազն {minimum} նիշ։"
+PROFILE_PASSWORD_UNCHANGED = "Նոր գաղտնաբառը պետք է տարբերվի ընթացիկից։"
+PROFILE_FORM_INVALID = "Ձևի տվյալները սխալ են կամ չափազանց երկար։"

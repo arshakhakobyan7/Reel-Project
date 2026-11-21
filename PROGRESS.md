@@ -6,10 +6,10 @@
 
 | | |
 |---|---|
-| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 57 of 59 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
+| **Overall status** | In development. Every pipeline stage exists and a job goes from the folder to Done (YouTube live since 2026-11-20 20:30; Slack, Classroom and notifications in dry-run). 58 of 61 tasks done; T-1002 (user review) and T-1003 (accounts) remain. |
 | **Current phase** | Phase 10 (verification, user requests) |
-| **Last completed task** | T-1015 — Duplicates per account (D-067, 2026-11-21 17:52) |
-| **Current task** | T-1016 — "My page" (/profile), given to GPT (handoff/T-1016.md); Claude reviews it when the report comes |
+| **Last completed task** | T-1016 — "My page" /profile (GPT, reviewed; D-068, 2026-11-21 18:50) |
+| **Current task** | T-1017 — «Հատվածավորում» heading, GPT working on it (handoff/T-1017.md); Claude reviews it when the report comes |
 | **Next task** | The user's choice: review of T-1002 / the 15-minute clip, follow-ups (a) faster silence check, (b) group vocabulary, (c) start phrases |
 | **Blocked tasks** | T-1003 needs free test accounts/credentials (Google/YouTube, Slack, Classroom). |
 | **Waiting for approval** | Since 2026-11-20 14:10: report after each task and wait for the user's OK before the next. |
@@ -207,6 +207,32 @@ ruff clean) and what was run on this PC.
 ---
 
 ## Log (newest first)
+
+### 2026-11-21 18:50 — T-1016 "My page" (GPT) reviewed — DONE; deployed to `ReelProject-live`
+
+- **GPT's report** (`handoff/T-1016.report.md`): `/profile` with two forms (details, password),
+  sign-in by username or email (username first, one lookup), the cost panel for admins only,
+  25 test functions (54 cases) in `tests/unit/test_profile.py`. No existing test changed.
+- **Review by Claude:**
+  - read every change: `profile.py`, `forms.py` (registration keeps its order and messages),
+    `texts.py`, `base.html`, `profile.html`, the two `app.py` spots, and the single
+    `recording.html` condition;
+  - no account id in the URL; CSRF applies (app-wide dependency, test); wrong current
+    passwords use the login throttle; a new session for this browser, and the other sessions
+    end (test); logs hold only ids.
+  - Own run: ruff clean, 1427 passed (-W error).
+- **Noted, not changed:**
+  - A password change holds the database write lock for scrypt verify and hash (measured
+    128 ms + 132 ms; workers wait up to 30 s): acceptable.
+  - Login failures typed as the email and as the username count under different `user:` keys.
+    The `client:` key still caps an address.
+  - GPT's follow-up: existing log lines name the username (an email for registered accounts):
+    sign-in and sign-out, and the staff actions on jobs. To be offered to the user.
+- **Commit:** GPT had already started T-1017 in `recording.html`. Only T-1016's hunk (the cost
+  condition) was staged, so T-1017's unstaged edits and `test_chapters_heading.py` stay in the
+  working tree.
+- **Deploy (D-069):** `ReelProject-live` moved to the T-1016 commit; then the full suite in that
+  worktree, a check that no job ran, and the restart.
 
 ### 2026-11-21 18:35 — T-1017 «Գլուխներ» → «Հատվածավորում» handed to GPT (user request)
 

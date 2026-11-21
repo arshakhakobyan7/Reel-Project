@@ -200,7 +200,7 @@
 </section>
 {% endif %}
 
-{% if d.cost %}
+{% if d.cost and user.is_admin %}
 <section class="card">
   <h2>Ծախս և ժամանակ</h2>
   <p>Մշակում՝ <strong>{{ clock(d.cost.processing_seconds) or "0:00" }}</strong>

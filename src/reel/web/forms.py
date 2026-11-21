@@ -16,6 +16,7 @@ from reel.config.loader import LoadedConfig
 from reel.config.schema import MetadataSettings
 from reel.db import normalize_username
 from reel.metadata.text import Chapter, ChapterError, check_chapters, format_timestamp
+from reel.web import texts
 from reel.web.security import MIN_PASSWORD_LENGTH, PasswordError, check_password_rules
 
 log = logging.getLogger("reel.web")
@@ -162,12 +163,22 @@ def _name(text: str, what: str) -> str:
     return name
 
 
-def parse_registration(
-    first_name: str, last_name: str, email: str, phone: str, password: str, again: str
-) -> Registration:
-    """What a new user typed in the registration form. Raises ValueError (Armenian)."""
-    first, last = _name(first_name, "անունը"), _name(last_name, "ազգանունը")
-    address = unicodedata.normalize("NFC", email or "").strip().casefold()
+@dataclass(frozen=True)
+class ProfileDetails:
+    first_name: str
+    last_name: str
+    email: str
+    phone: str | None
+
+    @property
+    def display_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+
+def _email(text: str, *, required: bool) -> str:
+    address = unicodedata.normalize("NFC", text or "").strip().casefold()
+    if not address and not required:
+        return ""
     if not _EMAIL.fullmatch(address):
         raise ValueError("Email-ը սխալ է. օրինակ՝ anna@example.com։")
     if len(address) > MAX_EMAIL_LENGTH:
@@ -176,13 +187,49 @@ def parse_registration(
         normalize_username(address)
     except ValueError:
         raise ValueError("Email-ում թույլատրված են տառեր, թվեր և . _ @ + - նշանները։") from None
-    number = _SPACES.sub(" ", (phone or "").strip())
+    return address
+
+
+def _phone(text: str) -> str | None:
+    number = _SPACES.sub(" ", (text or "").strip())
     if number and not (_PHONE.fullmatch(number) and sum(c.isdigit() for c in number) >= 5):
         raise ValueError("Հեռախոսահամարը սխալ է. օրինակ՝ +374 91 123456։")
+    return number or None
+
+
+def parse_profile(
+    first_name: str, last_name: str, email: str, phone: str, *, email_required: bool
+) -> ProfileDetails:
+    """Validate account details using registration's rules and Armenian errors."""
+    first, last = _name(first_name, "անունը"), _name(last_name, "ազգանունը")
+    address = _email(email, required=email_required)
+    number = _phone(phone)
+    return ProfileDetails(first, last, address, number)
+
+
+def parse_new_password(password: str, again: str, *, current: str | None = None) -> str:
+    """Validate confirmation and strength, then reject an unchanged password."""
     if password != again:
-        raise ValueError("Գաղտնաբառերը չեն համընկնում։")
+        raise ValueError(texts.PROFILE_PASSWORD_MISMATCH)
     try:
         check_password_rules(password)
     except PasswordError:
-        raise ValueError(f"Գաղտնաբառը պետք է ունենա առնվազն {MIN_PASSWORD_LENGTH} նիշ։") from None
-    return Registration(first, last, address, number or None, password)
+        raise ValueError(texts.PROFILE_PASSWORD_RULES.format(minimum=MIN_PASSWORD_LENGTH)) from None
+    if current is not None and password == current:
+        raise ValueError(texts.PROFILE_PASSWORD_UNCHANGED)
+    return password
+
+
+def parse_registration(
+    first_name: str, last_name: str, email: str, phone: str, password: str, again: str
+) -> Registration:
+    """What a new user typed in the registration form. Raises ValueError (Armenian)."""
+    details = parse_profile(first_name, last_name, email, phone, email_required=True)
+    new = parse_new_password(password, again)
+    return Registration(
+        details.first_name,
+        details.last_name,
+        details.email,
+        details.phone,
+        new,
+    )

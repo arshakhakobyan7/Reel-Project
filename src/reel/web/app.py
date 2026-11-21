@@ -166,7 +166,12 @@ def _check_login(db: Database, username: str, password: str) -> tuple[Staff, str
         canonical = None
     with db.transaction() as s:
         user = (
-            s.scalar(select(StaffUser).where(StaffUser.username == canonical))
+            s.scalar(
+                select(StaffUser)
+                .where((StaffUser.username == canonical) | (StaffUser.email == canonical))
+                .order_by((StaffUser.username == canonical).desc())
+                .limit(1)
+            )
             if canonical
             else None
         )
@@ -626,6 +631,9 @@ def create_app(
 
     uploads.install(app, staff=staff, render=render, state=_state)
     accounts.install(app, staff=staff, admin=admin, render=render, state=_state, account=Staff.of)
+    from reel.web import profile
+
+    profile.install(app, staff=staff, render=render, state=_state)
     api.install(app, state=_state)
 
     return app

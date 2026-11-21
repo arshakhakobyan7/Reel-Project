@@ -95,7 +95,7 @@ The PRD lists `Cleaned` before `Transcribed`. Here the transcript is made first,
 | T-1013 | Accounts: registration, users see their own uploads (only processed unless allowed to publish), admin account pages (user request, D-065) | Must | T-802, T-807 | DONE |
 | T-1014 | A user's processed video and uploaded files are deleted 30 days after the job ended; the page tells the date (user request, D-066) | Must | T-902, T-1013 | DONE |
 | T-1015 | Duplicates per account: a user's upload is not cancelled because another account has the same file; Armenian reason on the page (user report, D-067) | Must | T-204, T-1013 | DONE |
-| T-1016 | "My page" (`/profile`): every account checks and updates its details and password; sign-in by email; no cost panel for users (user request, D-068) | Must | T-1013 | GIVEN TO GPT (handoff/T-1016.md) |
+| T-1016 | "My page" (`/profile`): every account checks and updates its details and password; sign-in by email; no cost panel for users (user request, D-068) | Must | T-1013 | DONE (GPT, reviewed) |
 | T-1017 | Rename the «Գլուխներ» section of the recording page to «Հատվածավորում» (only that section; user request) | Should | T-1016 | GIVEN TO GPT (handoff/T-1017.md, after T-1016) |
 
 ---

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ texts.PROFILE_LABELS.title }}{% endblock %}
+{% block content %}
+<h1>{{ texts.PROFILE_LABELS.title }}</h1>
+{% if message %}<p class="notice" role="status">{{ message }}</p>{% endif %}
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <p>
+    <span class="badge">{{ p.role }}</span>
+    {% if p.publishes %}<span class="badge status-running">{{ texts.PROFILE_LABELS.publishes }}</span>{% else %}<span class="badge">{{ texts.PROFILE_LABELS.processes }}</span>{% endif %}
+  </p>
+  <dl class="facts">
+    <dt>{{ texts.PROFILE_LABELS.username }}</dt><dd>{{ p.username }}</dd>
+    <dt>{{ texts.PROFILE_LABELS.created }}</dt><dd>{{ p.created }}</dd>
+    <dt>{{ texts.PROFILE_LABELS.last_login }}</dt><dd>{{ p.last_login or "—" }}</dd>
+  </dl>
+</section>
+
+<section class="card actions">
+  <h2>{{ texts.PROFILE_LABELS.details }}</h2>
+  <form method="post" action="/profile/details">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="row">
+      <label for="first_name">{{ texts.PROFILE_LABELS.first_name }}
+        <input id="first_name" name="first_name" required maxlength="100" autocomplete="given-name" value="{{ form.first_name }}">
+      </label>
+      <label for="last_name">{{ texts.PROFILE_LABELS.last_name }}
+        <input id="last_name" name="last_name" required maxlength="100" autocomplete="family-name" value="{{ form.last_name }}">
+      </label>
+    </div>
+    <div class="row">
+      <label for="email">{{ texts.PROFILE_LABELS.email }}{% if not p.email_required %} {{ texts.PROFILE_LABELS.optional }}{% endif %}
+        <input id="email" name="email" type="email"{% if p.email_required %} required{% endif %} maxlength="64" autocomplete="email" value="{{ form.email }}">
+      </label>
+      <label for="phone">{{ texts.PROFILE_LABELS.phone }} {{ texts.PROFILE_LABELS.optional }}
+        <input id="phone" name="phone" type="tel" maxlength="30" autocomplete="tel" value="{{ form.phone }}">
+      </label>
+    </div>
+    <button type="submit">{{ texts.PROFILE_LABELS.save_details }}</button>
+  </form>
+</section>
+
+<section class="card actions">
+  <h2>{{ texts.PROFILE_LABELS.password }}</h2>
+  <form method="post" action="/profile/password">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="row">
+      <label for="current_password">{{ texts.PROFILE_LABELS.current_password }}
+        <input id="current_password" name="current_password" type="password" required maxlength="1024" autocomplete="current-password">
+      </label>
+      <label for="new_password">{{ texts.PROFILE_LABELS.new_password }}
+        <input id="new_password" name="new_password" type="password" required minlength="10" maxlength="1024" autocomplete="new-password">
+      </label>
+      <label for="password_again">{{ texts.PROFILE_LABELS.password_again }}
+        <input id="password_again" name="password_again" type="password" required minlength="10" maxlength="1024" autocomplete="new-password">
+      </label>
+    </div>
+    <button type="submit">{{ texts.PROFILE_LABELS.save_password }}</button>
+  </form>
+</section>
+{% endblock %}
