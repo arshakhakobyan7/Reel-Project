@@ -208,6 +208,36 @@ ruff clean) and what was run on this PC.
 
 ## Log (newest first)
 
+### 2026-11-21 19:45 — Project cleanup (the user: "only the clean project should remain")
+
+- **The user:** delete the files not needed for further work, and the registered users with
+  the videos they uploaded and that were processed. Be careful not to delete important files.
+- **Checks first:**
+  - All 10 videos to be deleted were hashed against `Desktopeel_videos`. All are identical
+    copies (IMG_0359, IMG_0360, IMG_0359_first15min, test.MOV), so no original was lost.
+  - The trial renders `test_reel.mp4` and `..._reel_v2.mp4` are identical to the files in
+    `reel_videos`.
+  - No job ran and no upload was open. The live server was stopped during the cleanup.
+- **Database** (backup `data/backups/reel-before-cleanup-20261121T153904Z.db`):
+  - account #2 (user) and its recordings and jobs #4–#7 were deleted, with their rows
+    (cascade): 10 stage runs, 24 events, 1 cut list, 1 metadata row, 2 transcripts;
+  - kept: account #1 (admin) and jobs #1, #2, #3;
+  - integrity ok, no foreign-key problems.
+- **Files** (from an explicit list, with protected paths refused): 390 files, 36.69 GB.
+  - Jobs #1, #3–#7: working folders and uploads.
+  - `samples/`, `data/trial15`, `data/trial_test`, `data/trial*` logs, and `data/trial`
+    except `jobs/1`.
+  - The 19 November logs and the caches.
+  - The project is now 8,746 files, 11 GB.
+- **Kept, for the user to decide:**
+  - `data/trial/jobs/1`: the full-lesson T-1002 render given for review, 1.3 GB.
+  - The backups `reel-v2` and `reel-before-cleanup`, which still hold the deleted account.
+  - Its sign-in lines in `logs/reel-serve.jsonl`.
+  - `tools/public-test` (Codex's external test, still running on 8091).
+  - The rows of the admin's cancelled jobs #1 and #3.
+- **After:** `reel serve` restarted 19:40, pages answer; `reel cleanup --dry-run` has nothing to
+  remove. Full suite 1430 passed (-W error), ruff clean.
+
 ### 2026-11-21 19:10 — T-1017 «Հատվածավորում» (GPT) reviewed — DONE; deployed
 
 - **GPT's report** (`handoff/T-1017.report.md`):
