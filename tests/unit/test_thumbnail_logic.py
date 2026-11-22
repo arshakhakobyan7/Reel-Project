@@ -228,3 +228,12 @@ def test_measured_advances_distinguish_narrow_and_wide_letters():
     assert thumbnail.measure_text("Wi") == pytest.approx(
         thumbnail.measure_text("W") + thumbnail.measure_text("i")
     )
+
+
+def test_the_frame_graph_works_with_ubuntu_ffmpeg_6_1(tmp_path):
+    # Ubuntu 24.04 ships FFmpeg 6.1, whose scale filter has no reset_sar option (T-1018).
+    graph = thumbnail._overlay(
+        tmp_path / "f.ttf", tmp_path / "s.ttf", tmp_path / "t.txt", tmp_path / "u.txt", 2, True
+    )
+    assert "reset_sar" not in graph
+    assert graph.startswith("scale=trunc(iw*sar/2)*2:ih,setsar=1,scale=1280:720:")

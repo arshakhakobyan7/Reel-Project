@@ -137,6 +137,21 @@ def test_portrait_aspect_ratio_is_kept_with_black_padding(media, tmp_path):
     assert 50 <= sum(middle) / len(middle) <= 80  # The original static picture is gray 64.
 
 
+def test_non_square_pixels_keep_the_picture_shape(tmp_path):
+    # Stored 160x180 with 2:1 pixels: shown as 320x180 (16:9), so it fills the whole 1280x720
+    # frame. Ignoring the pixel shape would give a 640x720 picture between black bars.
+    source = tmp_path / "anamorphic.mp4"
+    run_ffmpeg(
+        FFMPEG,
+        ["-y", "-v", "error", "-f", "lavfi", "-i", "color=c=0x404040:size=160x180:rate=25:d=2",
+         "-vf", "setsar=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(source)],
+    )  # fmt: skip
+    result = make_thumbnail(FFMPEG, FFPROBE, source, "Wide", tmp_path / "wide.jpg")
+    for x in (0, 1264):  # The left and right edges, above the title panel.
+        edge = gray_patch(result.path, x, 100)
+        assert 50 <= sum(edge) / len(edge) <= 80
+
+
 def test_missing_glyph_refuses_instead_of_replacing_existing_target(media, tmp_path):
     target = tmp_path / "existing.jpg"
     target.write_bytes(b"existing target")

@@ -314,7 +314,12 @@ def _overlay(
 ) -> str:
     panel = 56 + lines * 60 + (40 if has_subtitle else 0)
     filters = [
-        "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:reset_sar=1",
+        # Square pixels first, so a source with non-square pixels keeps its shape. Done with
+        # plain scale + setsar: scale's reset_sar option does not exist in the FFmpeg 6.1 of
+        # Ubuntu 24.04, and every thumbnail failed on the Google Cloud server (T-1018).
+        "scale=trunc(iw*sar/2)*2:ih",
+        "setsar=1",
+        "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2",
         "pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black",
         "setsar=1",
         f"drawbox=x=0:y=ih-{panel}:w=iw:h={panel}:color=black@0.72:t=fill",
