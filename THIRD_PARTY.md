@@ -62,6 +62,15 @@ Reel runs FFmpeg as a separate program and does not link to it. If you give FFmp
 people, its GPL terms apply. The build's source code is available from gyan.dev and
 ffmpeg.org.
 
+## Fonts
+
+Shipped in `assets/fonts/` with their licences (details in its README).
+
+| Font | Licence | Use |
+|---|---|---|
+| DejaVu Sans, DejaVu Sans Bold 2.37 | Bitstream Vera licence and public-domain changes | thumbnail text; Armenian text on the card |
+| Outfit Bold, Outfit SemiBold | SIL Open Font License 1.1 | the shared Reel thumbnail card (T-1018) |
+
 ## Models
 
 | Model | Licence | Use |

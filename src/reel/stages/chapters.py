@@ -27,6 +27,7 @@ from reel.config.groups import missing_group_message
 from reel.config.loader import LoadedConfig
 from reel.db import Job, Stage, TranscriptKind, VideoMetadata, utcnow
 from reel.llm import LLMClient, LLMError, MeteredLLM, OnDemandLLM
+from reel.media.card import make_card_thumbnail
 from reel.media.ffmpeg import FfmpegCancelled, FfmpegError, probe
 from reel.media.thumbnail import MissingGlyphs, make_thumbnail
 from reel.metadata.chapters import NOT_GENERATED, ChapterResult, generate_chapters, topic_summary
@@ -154,7 +155,9 @@ class ChaptersStage(StageHandler):
 
         # Thumbnail.
         thumbnail = None
-        if settings.thumbnail_enabled:
+        if settings.thumbnail_enabled and settings.thumbnail_style == "card":
+            thumbnail = self._card(ctx, group_name, lesson, flags)
+        elif settings.thumbnail_enabled:
             thumbnail = self._thumbnail(ctx, video, topic, title, flags)
 
         chapters = [{"start": round(c.start, 3), "title": c.title} for c in result.chapters]
@@ -194,6 +197,24 @@ class ChaptersStage(StageHandler):
             message=f"{title!r}: {len(chapters)} chapters"
             + ("" if thumbnail else ", no thumbnail"),
         )
+
+    def _card(self, ctx: StageContext, group: str, lesson: int, flags: list[str]) -> str | None:
+        """The shared Reel card with the group and the lesson (T-1018)."""
+        target = ctx.job_dir / THUMBNAIL_FILE
+        label = ctx.config.settings.metadata.thumbnail_lesson_label.replace("{lesson}", str(lesson))
+        try:
+            make_card_thumbnail(
+                ctx.config.paths.ffmpeg, target, group=group, lesson=label,
+                on_cancel=ctx.on_cancel,
+            )  # fmt: skip
+            return str(target)
+        except FfmpegCancelled:
+            ctx.check()
+            raise
+        except FfmpegError as exc:  # MissingGlyphs and ThumbnailError are FfmpegErrors
+            log.warning("thumbnail not made: %s", exc)
+        flags.append(NO_THUMBNAIL)
+        return None
 
     def _thumbnail(
         self, ctx: StageContext, video: Path, topic: str, title: str, flags: list[str]

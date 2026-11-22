@@ -388,6 +388,11 @@ class MetadataSettings(Section):
         "next topic",
     )
     thumbnail_enabled: bool = True
+    # "card": the shared Reel card (Picsart colours, group, lesson; T-1018); "frame": a frame
+    # of the video with the title on it (T-503).
+    thumbnail_style: Literal["card", "frame"] = "card"
+    # The lesson line of the card; {lesson} is the lesson number.
+    thumbnail_lesson_label: str = Field(default="Lecture {lesson}", max_length=40)
     # No chapters and fewer words per minute of video than this: the speech is not clear, and
     # staff decide whether to publish (with chapters they set) or cancel (T-1012). 0 = never.
     min_words_per_minute: float = Field(default=20.0, ge=0, le=300)

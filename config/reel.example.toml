@@ -184,6 +184,8 @@ chapter_start_phrases = [                  # a chapter starts exactly at such a 
     "հիմա կխոսենք", "հիմա խոսենք", "սկսենք", "let's move on", "next topic",
 ]
 thumbnail_enabled = true
+thumbnail_style = "card"                   # "card" = the shared Reel card, "frame" = a video frame
+thumbnail_lesson_label = "Lecture {lesson}"  # the card's lesson line
 min_words_per_minute = 20.0                # no chapters and less speech: staff decide (T-1012); 0 = never
 
 [consent]                                  # FR-20 ... FR-22 (D-008, D-019)

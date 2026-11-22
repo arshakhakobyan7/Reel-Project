@@ -1,5 +1,6 @@
 """Stage ``chapters`` end to end with a scripted LLM and a synthetic cleaned video (T-504)."""
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -17,12 +18,20 @@ from reel.db import (
     open_database,
 )
 from reel.llm import FakeLLM
-from reel.media.ffmpeg import probe
+from reel.media.card import LOGO_COLOUR
+from reel.media.ffmpeg import NO_WINDOW, probe
 from reel.media.testmedia import Part as Scene
 from reel.media.testmedia import make_lesson
 from reel.metadata.chapters import NOT_GENERATED
 from reel.queue import JobQueue, StageRegistry, Worker, create_job
-from reel.stages.chapters import METADATA_FILE, SPEECH_UNCLEAR, THUMBNAIL_FILE, ChaptersStage
+from reel.stages import chapters as chapters_stage
+from reel.stages.chapters import (
+    METADATA_FILE,
+    NO_THUMBNAIL,
+    SPEECH_UNCLEAR,
+    THUMBNAIL_FILE,
+    ChaptersStage,
+)
 from reel.stages.cleaning import CLEANED_FILE
 from reel.stt import Segment, Transcription, save_transcript
 
@@ -150,8 +159,44 @@ def test_title_description_chapters_and_thumbnail_are_stored(setup):
     thumbnail = probe(BIN / "ffprobe.exe", row.thumbnail_path)
     assert row.thumbnail_path == str(job_dir / THUMBNAIL_FILE)
     assert (thumbnail.width, thumbnail.height) == (1280, 720)
+    assert is_card(row.thumbnail_path)  # the shared card is the default (T-1018)
     assert (job_dir / METADATA_FILE).is_file()
     assert row.generator["topic"] in {c["title"] for c in row.chapters}
+
+
+def is_card(path) -> bool:
+    """The card's top-left corner has the Picsart logo colour; a video frame does not."""
+    command = [
+        str(BIN / "ffmpeg.exe"), "-v", "error", "-i", str(path), "-vf", "crop=8:8:0:0",
+        "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "pipe:1",
+    ]  # fmt: skip
+    data = subprocess.run(
+        command, capture_output=True, check=True, creationflags=NO_WINDOW, timeout=10
+    ).stdout
+    average = [sum(data[i::3]) / (len(data) // 3) for i in range(3)]
+    return all(abs(a - b) <= 12 for a, b in zip(average, LOGO_COLOUR, strict=True))
+
+
+def test_card_lesson_label_comes_from_the_settings(setup, monkeypatch):
+    made = []
+    real = chapters_stage.make_card_thumbnail
+    monkeypatch.setattr(
+        chapters_stage, "make_card_thumbnail",
+        lambda *a, **kw: made.append((kw["group"], kw["lesson"])) or real(*a, **kw),
+    )  # fmt: skip
+    cfg, db, job_id, _ = setup(metadata='thumbnail_lesson_label = "Դաս {lesson}"\n')
+    assert work(cfg, db) == []
+    job, row = load(db, job_id)
+    assert made == [("Python 12", "Դաս 14")]
+    assert NO_THUMBNAIL not in job.flags and is_card(row.thumbnail_path)
+
+
+def test_frame_style_still_makes_a_video_frame_thumbnail(setup):
+    cfg, db, job_id, _ = setup(metadata='thumbnail_style = "frame"\n')
+    assert work(cfg, db) == []
+    job, row = load(db, job_id)
+    assert NO_THUMBNAIL not in job.flags
+    assert not is_card(row.thumbnail_path)
 
 
 def test_missing_identification_holds_then_completes_after_release(setup):
